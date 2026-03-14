@@ -44,19 +44,19 @@ app.use(cors());
 
 // Test routes
 app.get("/api/test", (req, res) => {
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: "Backend is working!",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
 app.post("/api/test-upload", (req, res) => {
   console.log("Test upload received:", req.body);
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: "Upload endpoint is reachable",
-    received: req.body 
+    received: req.body,
   });
 });
 
@@ -64,18 +64,21 @@ app.post("/api/test-upload", (req, res) => {
 app.get("/api/health", async (req, res) => {
   try {
     const mongoose = await import("mongoose");
-    const dbStatus = mongoose.default.connection.readyState === 1 ? "Connected" : "Disconnected";
-    
-    res.json({ 
-      status: "OK", 
+    const dbStatus =
+      mongoose.default.connection.readyState === 1
+        ? "Connected"
+        : "Disconnected";
+
+    res.json({
+      status: "OK",
       database: dbStatus,
       timestamp: new Date().toISOString(),
-      models: Object.keys(mongoose.default.models)
+      models: Object.keys(mongoose.default.models),
     });
   } catch (error) {
-    res.status(500).json({ 
-      status: "Error", 
-      error: error.message 
+    res.status(500).json({
+      status: "Error",
+      error: error.message,
     });
   }
 });
@@ -116,28 +119,32 @@ if (resolvedFrontendPath) {
   app.get(/^\/(?!api)(.*)/, (req, res) => {
     res.sendFile(path.join(resolvedFrontendPath, "index.html"));
   });
-} else if (process.env.NODE_ENV === 'production') {
-  console.warn("⚠️ Frontend build not found. Set FRONTEND_DIST or run 'npm run build:client' from the Backend folder to copy the client dist.");
+} else if (process.env.NODE_ENV === "production") {
+  console.warn(
+    "⚠️ Frontend build not found. Set FRONTEND_DIST or run 'npm run build:client' from the Backend folder to copy the client dist.",
+  );
 } else {
   // in development we don't require a build, frontend runs separately
-  console.log("ℹ️ Frontend static not configured; run the React dev server instead.");
+  console.log(
+    "ℹ️ Frontend static not configured; run the React dev server instead.",
+  );
 }
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Server error:", err);
-  res.status(500).json({ 
-    success: false, 
+  res.status(500).json({
+    success: false,
     message: "Internal server error",
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    error: process.env.NODE_ENV === "development" ? err.message : undefined,
   });
 });
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: "Route not found" 
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
   });
 });
 
@@ -148,11 +155,33 @@ const io = new Server(server, {
 });
 app.set("io", io);
 
+const activeSockets = new Set();
+
 io.on("connection", (socket) => {
-  socket.on("join_listening", (data) => {
-    if (data?.room) socket.join(data.room);
+  console.log("🔌 Socket connected:", socket.id);
+
+  socket.on("user_started_listening", () => {
+    activeSockets.add(socket.id);
+
+    const count = activeSockets.size;
+    io.emit("users_listening", count);
+
+    console.log("▶️ Users listening:", count);
   });
-  socket.on("disconnect", () => {});
+
+  socket.on("user_stopped_listening", () => {
+    activeSockets.delete(socket.id);
+
+    io.emit("users_listening", activeSockets.size);
+  });
+
+  socket.on("disconnect", () => {
+    activeSockets.delete(socket.id);
+
+    io.emit("users_listening", activeSockets.size);
+
+    console.log("🔌 Socket disconnected:", socket.id);
+  });
 });
 
 // Function to find an available port
@@ -163,10 +192,12 @@ const findAvailablePort = (startPort) => {
       const port = server.address().port;
       server.close(() => resolve(port));
     });
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
+    server.on("error", (err) => {
+      if (err.code === "EADDRINUSE") {
         // Try next port
-        findAvailablePort(startPort + 1).then(resolve).catch(reject);
+        findAvailablePort(startPort + 1)
+          .then(resolve)
+          .catch(reject);
       } else {
         reject(err);
       }
@@ -180,11 +211,13 @@ findAvailablePort(port)
     server.listen(availablePort, () => {
       console.log(`✅ Server listening on localhost:${availablePort}`);
       if (availablePort !== port) {
-        console.log(`ℹ️ Port ${port} was in use, using ${availablePort} instead`);
+        console.log(
+          `ℹ️ Port ${port} was in use, using ${availablePort} instead`,
+        );
       }
     });
   })
   .catch((err) => {
-    console.error('❌ Failed to find available port:', err);
+    console.error("❌ Failed to find available port:", err);
     process.exit(1);
   });

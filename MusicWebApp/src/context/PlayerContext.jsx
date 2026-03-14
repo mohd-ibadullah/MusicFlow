@@ -13,7 +13,7 @@ import axios from "axios";
 import { useToast } from "./ThemeContext";
 import { useAuth } from "./AuthContext";
 // Import sample data for fallback
-import { sampleSongs, sampleAlbums } from '../data/sampleData';
+import { sampleSongs, sampleAlbums } from "../data/sampleData";
 
 export const PlayerContext = createContext();
 
@@ -25,6 +25,26 @@ const PlayerContextProvider = (props) => {
   const lastPlayCountedRef = useRef({ songId: null, at: 0 });
   const userRef = useRef(user);
   const socketRef = useRef(null);
+  // Unique listener ID (works for both logged-in users and guests)
+  const listenerIdRef = useRef(null);
+
+  useEffect(() => {
+    const uid = user?._id ?? user?.id;
+
+    if (uid) {
+      listenerIdRef.current = String(uid);
+    } else {
+      const saved = localStorage.getItem("guestListenerId");
+
+      if (saved) {
+        listenerIdRef.current = saved;
+      } else {
+        const guestId = "guest_" + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem("guestListenerId", guestId);
+        listenerIdRef.current = guestId;
+      }
+    }
+  }, [user]);
   userRef.current = user;
 
   const url = import.meta.env.VITE_API_URL || "http://localhost:4000";
@@ -40,56 +60,86 @@ const PlayerContextProvider = (props) => {
         // Try to fetch from backend with timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-        
+
         const requests = [
-          axios.get(`${url}/api/song/list`, { signal: controller.signal }).catch(() => ({ data: [] })),
-          axios.get(`${url}/api/album/list`, { signal: controller.signal }).catch(() => ({ data: [] })),
+          axios
+            .get(`${url}/api/song/list`, { signal: controller.signal })
+            .catch(() => ({ data: [] })),
+          axios
+            .get(`${url}/api/album/list`, { signal: controller.signal })
+            .catch(() => ({ data: [] })),
         ];
         // Only attempt authenticated playlists fetch when user is logged in
         if (isAuthenticated) {
           requests.push(
             axios
               .get(`${url}/api/playlist/list`, { signal: controller.signal })
-              .catch(() => ({ data: {} }))
+              .catch(() => ({ data: {} })),
           );
         }
 
-        const [songsRes, albumsRes, playlistsResRaw] = await Promise.all(requests);
-        
+        const [songsRes, albumsRes, playlistsResRaw] =
+          await Promise.all(requests);
+
         clearTimeout(timeoutId);
-        
+
         // Debug backend responses
-        console.log('Backend songs response structure:', Object.keys(songsRes.data || {}));
-        console.log('Backend albums response structure:', Object.keys(albumsRes.data || {}));
-        console.log('Backend playlists response structure:', Object.keys(playlistsResRaw?.data || {}));
-        
+        console.log(
+          "Backend songs response structure:",
+          Object.keys(songsRes.data || {}),
+        );
+        console.log(
+          "Backend albums response structure:",
+          Object.keys(albumsRes.data || {}),
+        );
+        console.log(
+          "Backend playlists response structure:",
+          Object.keys(playlistsResRaw?.data || {}),
+        );
+
         // Use backend data if available, otherwise use sample data
         // Handle different backend response structures
-        const finalSongs = Array.isArray(songsRes.data?.data) && songsRes.data.data.length > 0 ? songsRes.data.data : 
-                          Array.isArray(songsRes.data) && songsRes.data.length > 0 ? songsRes.data : sampleSongs;
-        
-        const finalAlbums = Array.isArray(albumsRes.data?.allAlbums) && albumsRes.data.allAlbums.length > 0 ? albumsRes.data.allAlbums :
-                           Array.isArray(albumsRes.data) && albumsRes.data.length > 0 ? albumsRes.data : sampleAlbums;
-        
+        const finalSongs =
+          Array.isArray(songsRes.data?.data) && songsRes.data.data.length > 0
+            ? songsRes.data.data
+            : Array.isArray(songsRes.data) && songsRes.data.length > 0
+              ? songsRes.data
+              : sampleSongs;
+
+        const finalAlbums =
+          Array.isArray(albumsRes.data?.allAlbums) &&
+          albumsRes.data.allAlbums.length > 0
+            ? albumsRes.data.allAlbums
+            : Array.isArray(albumsRes.data) && albumsRes.data.length > 0
+              ? albumsRes.data
+              : sampleAlbums;
+
         let finalPlaylists = [];
         if (isAuthenticated && playlistsResRaw) {
           const playlistsRes = playlistsResRaw;
           finalPlaylists =
-            Array.isArray(playlistsRes.data?.playlists) && playlistsRes.data.playlists.length > 0
+            Array.isArray(playlistsRes.data?.playlists) &&
+            playlistsRes.data.playlists.length > 0
               ? playlistsRes.data.playlists
               : Array.isArray(playlistsRes.data) && playlistsRes.data.length > 0
-              ? playlistsRes.data
-              : [];
+                ? playlistsRes.data
+                : [];
         }
-        
-        console.log('Data loaded - Songs:', finalSongs.length, 'Albums:', finalAlbums.length, 'Playlists:', finalPlaylists.length);
-        
+
+        console.log(
+          "Data loaded - Songs:",
+          finalSongs.length,
+          "Albums:",
+          finalAlbums.length,
+          "Playlists:",
+          finalPlaylists.length,
+        );
+
         setSongsData(finalSongs);
         setAlbumsData(finalAlbums);
         setPlaylists(finalPlaylists);
-        
       } catch (err) {
-        console.log('Backend not available, using sample data:', err.message);
+        console.log("Backend not available, using sample data:", err.message);
         // Use sample data as fallback
         setSongsData(sampleSongs);
         setAlbumsData(sampleAlbums);
@@ -98,7 +148,7 @@ const PlayerContextProvider = (props) => {
     };
     fetchData();
   }, []);
-  
+
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
 
   // Player state
@@ -136,8 +186,10 @@ const PlayerContextProvider = (props) => {
   const getSafeLikedSongs = () => (Array.isArray(likedSongs) ? likedSongs : []);
   const getSafeRecentlyPlayed = () =>
     Array.isArray(recentlyPlayed) ? recentlyPlayed : [];
-  const getSafeRecommendations = () => (Array.isArray(recommendations) ? recommendations : []);
-  const getSafeTrendingSongs = () => (Array.isArray(trendingSongs) ? trendingSongs : []);
+  const getSafeRecommendations = () =>
+    Array.isArray(recommendations) ? recommendations : [];
+  const getSafeTrendingSongs = () =>
+    Array.isArray(trendingSongs) ? trendingSongs : [];
 
   // Load data from localStorage on mount (for both authenticated and non-authenticated users)
   useEffect(() => {
@@ -150,7 +202,8 @@ const PlayerContextProvider = (props) => {
       // For non-authenticated users, always load from localStorage
       if (!isAuthenticated) {
         if (savedLikedSongs) setLikedSongs(JSON.parse(savedLikedSongs));
-        if (savedRecentlyPlayed) setRecentlyPlayed(JSON.parse(savedRecentlyPlayed));
+        if (savedRecentlyPlayed)
+          setRecentlyPlayed(JSON.parse(savedRecentlyPlayed));
       }
       if (savedVolume) setVolume(parseInt(savedVolume));
     } catch (error) {
@@ -163,7 +216,10 @@ const PlayerContextProvider = (props) => {
     try {
       const likedSongsToSave = Array.isArray(likedSongs) ? likedSongs : [];
       localStorage.setItem("likedSongs", JSON.stringify(likedSongsToSave));
-      console.log("💾 Saved liked songs to localStorage:", likedSongsToSave.length);
+      console.log(
+        "💾 Saved liked songs to localStorage:",
+        likedSongsToSave.length,
+      );
     } catch (error) {
       console.error("Error saving liked songs to localStorage:", error);
     }
@@ -171,9 +227,17 @@ const PlayerContextProvider = (props) => {
 
   useEffect(() => {
     try {
-      const recentlyPlayedToSave = Array.isArray(recentlyPlayed) ? recentlyPlayed : [];
-      localStorage.setItem("recentlyPlayed", JSON.stringify(recentlyPlayedToSave));
-      console.log("💾 Saved recently played to localStorage:", recentlyPlayedToSave.length);
+      const recentlyPlayedToSave = Array.isArray(recentlyPlayed)
+        ? recentlyPlayed
+        : [];
+      localStorage.setItem(
+        "recentlyPlayed",
+        JSON.stringify(recentlyPlayedToSave),
+      );
+      console.log(
+        "💾 Saved recently played to localStorage:",
+        recentlyPlayedToSave.length,
+      );
     } catch (error) {
       console.error("Error saving recently played to localStorage:", error);
     }
@@ -200,8 +264,10 @@ const PlayerContextProvider = (props) => {
 
     try {
       // Update backend
-      const response = await axios.post(`${url}/api/song/recently-played`, { songId: song._id });
-      
+      const response = await axios.post(`${url}/api/song/recently-played`, {
+        songId: song._id,
+      });
+
       if (!response.data.success) {
         // Revert optimistic update on failure
         setRecentlyPlayed((prev) => {
@@ -224,37 +290,44 @@ const PlayerContextProvider = (props) => {
   // Use ThemeContext's toast; assume PlayerContext is used within ThemeProvider
   const themeToast = useToast();
 
-  const showToast = useCallback((message, type = "info") => {
-    if (themeToast && typeof themeToast.showToast === 'function') {
-      themeToast.showToast(message, type);
-    } else {
-      console.log(`[${type.toUpperCase()}]: ${message}`);
-    }
-  }, [themeToast]);
+  const showToast = useCallback(
+    (message, type = "info") => {
+      if (themeToast && typeof themeToast.showToast === "function") {
+        themeToast.showToast(message, type);
+      } else {
+        console.log(`[${type.toUpperCase()}]: ${message}`);
+      }
+    },
+    [themeToast],
+  );
 
   // Emit listener status to socket (reusable)
   const emitStartedListening = useCallback(() => {
-    const uid = userRef.current?._id ?? userRef.current?.id;
-    if (!uid) return;
     const sock = socketRef.current;
-    if (sock) {
-      const userId = typeof uid === "string" ? uid : String(uid);
-      sock.emit("user_started_listening", userId);
-      console.log("Started listening:", userId);
-    }
+    const listenerId = listenerIdRef.current;
+
+    if (!sock || !listenerId) return;
+
+    sock.emit("user_started_listening", { userId: listenerId });
+
+    console.log("Started listening:", listenerId);
   }, []);
+
   const emitStoppedListening = useCallback(() => {
-    const uid = userRef.current?._id ?? userRef.current?.id;
-    if (!uid) return;
     const sock = socketRef.current;
-    if (sock) sock.emit("user_stopped_listening", typeof uid === "string" ? uid : String(uid));
+    const listenerId = listenerIdRef.current;
+
+    if (!sock || !listenerId) return;
+
+    sock.emit("user_stopped_listening", { userId: listenerId });
   }, []);
 
   // Player controls
   const play = useCallback(() => {
     if (audioRef.current && track) {
       audioRef.current.volume = volume / 100;
-      audioRef.current.play()
+      audioRef.current
+        .play()
         .then(() => {
           setPlayStatus(true);
           emitStartedListening();
@@ -289,7 +362,7 @@ const PlayerContextProvider = (props) => {
         showToast("No song selected", "error");
         return;
       }
-      
+
       const safeSongs = getSafeSongsData();
       let song = safeSongs.find((item) => item?._id === id);
       if (!song && Array.isArray(playlist) && playlist.length > 0) {
@@ -299,12 +372,12 @@ const PlayerContextProvider = (props) => {
         showToast("Song not found", "error");
         return;
       }
-      
+
       if (!song.file) {
         showToast("Song file not available", "error");
         return;
       }
-      
+
       try {
         setTrack(song);
         addToRecentlyPlayed(song);
@@ -312,67 +385,73 @@ const PlayerContextProvider = (props) => {
         setCurrentPlaylist(safePlaylist);
         const songIndex = safePlaylist.findIndex((item) => item?._id === id);
         setCurrentPlaylistIndex(songIndex >= 0 ? songIndex : 0);
-        
+
         if (audioRef.current) {
           // Stop current playback
           audioRef.current.pause();
           audioRef.current.currentTime = 0;
-          
+
           // Set new source
           audioRef.current.src = song.file;
           audioRef.current.load();
-          
+
           // Wait for audio to be ready
           const handleCanPlay = () => {
-            audioRef.current.removeEventListener('canplay', handleCanPlay);
-            audioRef.current.play().then(() => {
-              setPlayStatus(true);
-              showToast(`Now playing: ${song.name}`, "success");
-              emitStartedListening();
+            audioRef.current.removeEventListener("canplay", handleCanPlay);
+            audioRef.current
+              .play()
+              .then(() => {
+                setPlayStatus(true);
+                showToast(`Now playing: ${song.name}`, "success");
+                emitStartedListening();
 
-              // Track a "play" only once per track start (even if events fire multiple times)
-              try {
-                const now = Date.now();
-                const prev = lastPlayCountedRef.current || {};
-                const sameSongRecently =
-                  prev.songId === song._id && now - (prev.at || 0) < 15000;
-                if (!sameSongRecently) {
-                  lastPlayCountedRef.current = { songId: song._id, at: now };
-                  axios
-                    .post(`${url}/api/song/play/${song._id}`)
-                    .catch((e) =>
-                      console.warn(
-                        "playCount increment failed:",
-                        e?.response?.data?.message || e.message
-                      )
-                    );
+                // Track a "play" only once per track start (even if events fire multiple times)
+                try {
+                  const now = Date.now();
+                  const prev = lastPlayCountedRef.current || {};
+                  const sameSongRecently =
+                    prev.songId === song._id && now - (prev.at || 0) < 15000;
+                  if (!sameSongRecently) {
+                    lastPlayCountedRef.current = { songId: song._id, at: now };
+                    axios
+                      .post(`${url}/api/song/play/${song._id}`)
+                      .catch((e) =>
+                        console.warn(
+                          "playCount increment failed:",
+                          e?.response?.data?.message || e.message,
+                        ),
+                      );
+                  }
+                } catch (e) {
+                  console.warn("playCount increment skipped:", e.message);
                 }
-              } catch (e) {
-                console.warn("playCount increment skipped:", e.message);
-              }
-            }).catch((error) => {
-              console.error("Play error:", error);
-              showToast("Failed to play song. Please try again.", "error");
-              setPlayStatus(false);
-            });
+              })
+              .catch((error) => {
+                console.error("Play error:", error);
+                showToast("Failed to play song. Please try again.", "error");
+                setPlayStatus(false);
+              });
           };
-          
+
           const handleError = () => {
-            audioRef.current.removeEventListener('error', handleError);
+            audioRef.current.removeEventListener("error", handleError);
             console.error("Audio load error for:", song.file);
             showToast("Failed to load song. Please try another song.", "error");
             setPlayStatus(false);
           };
-          
-          audioRef.current.addEventListener('canplay', handleCanPlay);
-          audioRef.current.addEventListener('error', handleError);
-          
+
+          audioRef.current.addEventListener("canplay", handleCanPlay);
+          audioRef.current.addEventListener("error", handleError);
+
           // Fallback timeout
           setTimeout(() => {
             if (!playStatus) {
-              audioRef.current.removeEventListener('canplay', handleCanPlay);
-              audioRef.current.removeEventListener('error', handleError);
-              showToast("Song is taking too long to load. Please try again.", "error");
+              audioRef.current.removeEventListener("canplay", handleCanPlay);
+              audioRef.current.removeEventListener("error", handleError);
+              showToast(
+                "Song is taking too long to load. Please try again.",
+                "error",
+              );
             }
           }, 10000);
         }
@@ -381,13 +460,19 @@ const PlayerContextProvider = (props) => {
         showToast("Failed to play song", "error");
       }
     },
-    [getSafeSongsData, addToRecentlyPlayed, showToast, playStatus, emitStartedListening]
+    [
+      getSafeSongsData,
+      addToRecentlyPlayed,
+      showToast,
+      playStatus,
+      emitStartedListening,
+    ],
   );
 
   // Enhanced playlist playback function
   const playPlaylist = useCallback(
     (playlistId) => {
-      const playlist = playlists.find(p => p._id === playlistId);
+      const playlist = playlists.find((p) => p._id === playlistId);
       if (!playlist || !playlist.songs || playlist.songs.length === 0) {
         showToast("Playlist is empty or not found", "error");
         return;
@@ -400,7 +485,7 @@ const PlayerContextProvider = (props) => {
         showToast(`Playing playlist: ${playlist.name}`, "success");
       }
     },
-    [playlists, playWithId, showToast]
+    [playlists, playWithId, showToast],
   );
 
   const next = useCallback(() => {
@@ -460,9 +545,17 @@ const PlayerContextProvider = (props) => {
   }, [currentPlaylist, currentPlaylistIndex, addToRecentlyPlayed, play]);
 
   const seekSong = useCallback((e) => {
-    if (!audioRef.current || !seekBg.current || !Number.isFinite(audioRef.current.duration)) return;
+    if (
+      !audioRef.current ||
+      !seekBg.current ||
+      !Number.isFinite(audioRef.current.duration)
+    )
+      return;
     const rect = seekBg.current.getBoundingClientRect();
-    const percent = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+    const percent = Math.min(
+      Math.max((e.clientX - rect.left) / rect.width, 0),
+      1,
+    );
     const seekTime = percent * audioRef.current.duration;
     const wasPlaying = !audioRef.current.paused;
     audioRef.current.currentTime = seekTime;
@@ -495,25 +588,29 @@ const PlayerContextProvider = (props) => {
         showToast("Invalid song ID", "error");
         return;
       }
-      
+
       const currentLikedSongs = getSafeLikedSongs();
       const safeSongs = getSafeSongsData();
-      const song = safeSongs.find(s => s._id === songId);
-      
+      const song = safeSongs.find((s) => s._id === songId);
+
       if (!song) {
         showToast("Song not found", "error");
         return;
       }
-      
-      const isCurrentlyLiked = currentLikedSongs.some(likedSong => 
-        typeof likedSong === 'string' ? likedSong === songId : likedSong._id === songId
+
+      const isCurrentlyLiked = currentLikedSongs.some((likedSong) =>
+        typeof likedSong === "string"
+          ? likedSong === songId
+          : likedSong._id === songId,
       );
-      
+
       // Optimistic update - update UI immediately
       if (isCurrentlyLiked) {
         // Unlike the song
-        const updatedLikedSongs = currentLikedSongs.filter(likedSong => 
-          typeof likedSong === 'string' ? likedSong !== songId : likedSong._id !== songId
+        const updatedLikedSongs = currentLikedSongs.filter((likedSong) =>
+          typeof likedSong === "string"
+            ? likedSong !== songId
+            : likedSong._id !== songId,
         );
         setLikedSongs(updatedLikedSongs);
         showToast(`Removed "${song.name}" from liked songs`, "info");
@@ -523,7 +620,7 @@ const PlayerContextProvider = (props) => {
         setLikedSongs(updatedLikedSongs);
         showToast(`Added "${song.name}" to liked songs`, "success");
       }
-      
+
       try {
         let response;
         if (isCurrentlyLiked) {
@@ -533,11 +630,14 @@ const PlayerContextProvider = (props) => {
           // Like the song
           response = await axios.post(`${url}/api/song/like`, { songId });
         }
-        
+
         if (!response.data.success) {
           // Revert optimistic update on failure
           setLikedSongs(currentLikedSongs);
-          showToast(response.data.message || "Failed to update liked songs", "error");
+          showToast(
+            response.data.message || "Failed to update liked songs",
+            "error",
+          );
         }
       } catch (error) {
         console.error("Error toggling like:", error);
@@ -546,82 +646,116 @@ const PlayerContextProvider = (props) => {
         showToast("Failed to update liked songs", "error");
       }
     },
-    [getSafeLikedSongs, getSafeSongsData, showToast]
+    [getSafeLikedSongs, getSafeSongsData, showToast],
   );
 
-  const isSongLiked = useCallback((songId) => {
-    const likedSongs = getSafeLikedSongs();
-    return likedSongs.some(likedSong => 
-      typeof likedSong === 'string' ? likedSong === songId : likedSong._id === songId
-    );
-  }, [getSafeLikedSongs]);
+  const isSongLiked = useCallback(
+    (songId) => {
+      const likedSongs = getSafeLikedSongs();
+      return likedSongs.some((likedSong) =>
+        typeof likedSong === "string"
+          ? likedSong === songId
+          : likedSong._id === songId,
+      );
+    },
+    [getSafeLikedSongs],
+  );
 
   // Search functionality
-  const performSearch = useCallback((query) => {
-    const qRaw = typeof query === 'string' ? query : '';
-    const q = qRaw.trim();
-    
-    console.log('Search query:', q, 'Available songs:', getSafeSongsData().length);
-    
-    if (!q) {
-      setSearchResults({ songs: [], albums: [], playlists: [] });
-      return;
-    }
+  const performSearch = useCallback(
+    (query) => {
+      const qRaw = typeof query === "string" ? query : "";
+      const q = qRaw.trim();
 
-    // Normalization helper (removes accents and lowercases)
-    const normalize = (str) => {
-      try {
-        return (str || '')
-          .toString()
-          .normalize('NFD')
-          .replace(/\p{Diacritic}/gu, '')
-          .toLowerCase();
-      } catch (_e) {
-        return (str || '').toString().toLowerCase();
+      console.log(
+        "Search query:",
+        q,
+        "Available songs:",
+        getSafeSongsData().length,
+      );
+
+      if (!q) {
+        setSearchResults({ songs: [], albums: [], playlists: [] });
+        return;
       }
-    };
 
-    const needle = normalize(q);
-    const safeSongs = getSafeSongsData();
-    const safeAlbums = getSafeAlbumsData();
-    const safePlaylists = getSafePlaylists();
+      // Normalization helper (removes accents and lowercases)
+      const normalize = (str) => {
+        try {
+          return (str || "")
+            .toString()
+            .normalize("NFD")
+            .replace(/\p{Diacritic}/gu, "")
+            .toLowerCase();
+        } catch (_e) {
+          return (str || "").toString().toLowerCase();
+        }
+      };
 
-    // Match songs by common string fields (be generous to backend shape)
-    const matchedSongs = safeSongs.filter((song) => {
-      const hayParts = [
-        song?.name,
-        song?.title,
-        song?.desc,
-        song?.description,
-        song?.album,
-        song?.artist,
-        Array.isArray(song?.artists) ? song.artists.join(' ') : undefined
-      ];
-      const hay = normalize(hayParts.filter(Boolean).join(' '));
-      return hay.includes(needle);
-    });
+      const needle = normalize(q);
+      const safeSongs = getSafeSongsData();
+      const safeAlbums = getSafeAlbumsData();
+      const safePlaylists = getSafePlaylists();
 
-    const matchedAlbums = safeAlbums.filter((album) => {
-      const hayParts = [album?.name, album?.title, album?.desc, album?.artist];
-      const hay = normalize(hayParts.filter(Boolean).join(' '));
-      return hay.includes(needle);
-    });
+      // Match songs by common string fields (be generous to backend shape)
+      const matchedSongs = safeSongs.filter((song) => {
+        const hayParts = [
+          song?.name,
+          song?.title,
+          song?.desc,
+          song?.description,
+          song?.album,
+          song?.artist,
+          Array.isArray(song?.artists) ? song.artists.join(" ") : undefined,
+        ];
+        const hay = normalize(hayParts.filter(Boolean).join(" "));
+        return hay.includes(needle);
+      });
 
-    const matchedPlaylists = safePlaylists.filter((playlist) => {
-      const hayParts = [playlist?.name, playlist?.title, playlist?.desc, playlist?.description];
-      const hay = normalize(hayParts.filter(Boolean).join(' '));
-      return hay.includes(needle);
-    });
+      const matchedAlbums = safeAlbums.filter((album) => {
+        const hayParts = [
+          album?.name,
+          album?.title,
+          album?.desc,
+          album?.artist,
+        ];
+        const hay = normalize(hayParts.filter(Boolean).join(" "));
+        return hay.includes(needle);
+      });
 
-    console.log('Search results - Songs:', matchedSongs.length, 'Albums:', matchedAlbums.length, 'Playlists:', matchedPlaylists.length);
-    
-    setSearchResults({ songs: matchedSongs, albums: matchedAlbums, playlists: matchedPlaylists });
-  }, [songsData, albumsData, playlists]);
+      const matchedPlaylists = safePlaylists.filter((playlist) => {
+        const hayParts = [
+          playlist?.name,
+          playlist?.title,
+          playlist?.desc,
+          playlist?.description,
+        ];
+        const hay = normalize(hayParts.filter(Boolean).join(" "));
+        return hay.includes(needle);
+      });
+
+      console.log(
+        "Search results - Songs:",
+        matchedSongs.length,
+        "Albums:",
+        matchedAlbums.length,
+        "Playlists:",
+        matchedPlaylists.length,
+      );
+
+      setSearchResults({
+        songs: matchedSongs,
+        albums: matchedAlbums,
+        playlists: matchedPlaylists,
+      });
+    },
+    [songsData, albumsData, playlists],
+  );
 
   // Debounced search: when `searchQuery` changes, run performSearch after a short pause
   // Also re-run when songsData/albumsData/playlists load (e.g. async fetch) so results update
   useEffect(() => {
-    const q = typeof searchQuery === 'string' ? searchQuery.trim() : '';
+    const q = typeof searchQuery === "string" ? searchQuery.trim() : "";
     if (!q) {
       setSearchResults({ songs: [], albums: [], playlists: [] });
       return;
@@ -653,7 +787,7 @@ const PlayerContextProvider = (props) => {
         } else {
           showToast(
             response.data.message || "Failed to create playlist",
-            "error"
+            "error",
           );
           return { success: false };
         }
@@ -665,7 +799,7 @@ const PlayerContextProvider = (props) => {
         return { success: false, message };
       }
     },
-    [showToast]
+    [showToast],
   );
 
   const deletePlaylist = useCallback(
@@ -676,8 +810,11 @@ const PlayerContextProvider = (props) => {
       }
 
       // Check if this is a sample playlist (IDs like 'p1', 'p2', etc.)
-      if (playlistId.startsWith('p') && playlistId.length <= 3) {
-        showToast("Sample playlists cannot be deleted. Please log in to create and manage your own playlists.", "info");
+      if (playlistId.startsWith("p") && playlistId.length <= 3) {
+        showToast(
+          "Sample playlists cannot be deleted. Please log in to create and manage your own playlists.",
+          "info",
+        );
         return { success: false };
       }
 
@@ -689,7 +826,7 @@ const PlayerContextProvider = (props) => {
 
       try {
         const response = await axios.delete(
-          `${url}/api/playlist/delete/${playlistId}`
+          `${url}/api/playlist/delete/${playlistId}`,
         );
 
         if (response.data.success) {
@@ -699,7 +836,7 @@ const PlayerContextProvider = (props) => {
         } else {
           showToast(
             response.data.message || "Failed to delete playlist",
-            "error"
+            "error",
           );
           return { success: false };
         }
@@ -711,7 +848,7 @@ const PlayerContextProvider = (props) => {
         return { success: false, message };
       }
     },
-    [showToast, isAuthenticated]
+    [showToast, isAuthenticated],
   );
 
   const addSongToPlaylist = useCallback(
@@ -722,8 +859,11 @@ const PlayerContextProvider = (props) => {
       }
 
       // Check if this is a sample playlist
-      if (playlistId.startsWith('p') && playlistId.length <= 3) {
-        showToast("Sample playlists cannot be modified. Please log in to create your own playlists.", "info");
+      if (playlistId.startsWith("p") && playlistId.length <= 3) {
+        showToast(
+          "Sample playlists cannot be modified. Please log in to create your own playlists.",
+          "info",
+        );
         return { success: false };
       }
 
@@ -735,29 +875,31 @@ const PlayerContextProvider = (props) => {
 
       try {
         // Find the song to add
-        const songToAdd = songsData.find(song => song._id === songId);
+        const songToAdd = songsData.find((song) => song._id === songId);
         if (!songToAdd) {
           showToast("Song not found", "error");
           return { success: false };
         }
 
         // Optimistically update the local state first for instant UI update
-        setPlaylists(prevPlaylists => 
-          prevPlaylists.map(playlist => {
+        setPlaylists((prevPlaylists) =>
+          prevPlaylists.map((playlist) => {
             if (playlist._id === playlistId) {
               // Check if song already exists in playlist
-              const songExists = playlist.songs?.some(song => song._id === songId);
+              const songExists = playlist.songs?.some(
+                (song) => song._id === songId,
+              );
               if (songExists) {
                 showToast("Song already exists in this playlist", "error");
                 return playlist;
               }
               return {
                 ...playlist,
-                songs: [...(playlist.songs || []), songToAdd]
+                songs: [...(playlist.songs || []), songToAdd],
               };
             }
             return playlist;
-          })
+          }),
         );
 
         const response = await axios.post(`${url}/api/playlist/add-song`, {
@@ -770,7 +912,9 @@ const PlayerContextProvider = (props) => {
           try {
             const response = await axios.get(`${url}/api/playlist/list`);
             if (response.data.success) {
-              const pls = Array.isArray(response.data.playlists) ? response.data.playlists : [];
+              const pls = Array.isArray(response.data.playlists)
+                ? response.data.playlists
+                : [];
               setPlaylists(pls);
             }
           } catch (refreshError) {
@@ -783,7 +927,9 @@ const PlayerContextProvider = (props) => {
           try {
             const response = await axios.get(`${url}/api/playlist/list`);
             if (response.data.success) {
-              const pls = Array.isArray(response.data.playlists) ? response.data.playlists : [];
+              const pls = Array.isArray(response.data.playlists)
+                ? response.data.playlists
+                : [];
               setPlaylists(pls);
             }
           } catch (refreshError) {
@@ -798,7 +944,9 @@ const PlayerContextProvider = (props) => {
         try {
           const response = await axios.get(`${url}/api/playlist/list`);
           if (response.data.success) {
-            const pls = Array.isArray(response.data.playlists) ? response.data.playlists : [];
+            const pls = Array.isArray(response.data.playlists)
+              ? response.data.playlists
+              : [];
             setPlaylists(pls);
           }
         } catch (refreshError) {
@@ -809,7 +957,7 @@ const PlayerContextProvider = (props) => {
         return { success: false, message };
       }
     },
-    [showToast, songsData, isAuthenticated]
+    [showToast, songsData, isAuthenticated],
   );
 
   const removeSongFromPlaylist = useCallback(
@@ -820,8 +968,11 @@ const PlayerContextProvider = (props) => {
       }
 
       // Check if this is a sample playlist
-      if (playlistId.startsWith('p') && playlistId.length <= 3) {
-        showToast("Sample playlists cannot be modified. Please log in to create your own playlists.", "info");
+      if (playlistId.startsWith("p") && playlistId.length <= 3) {
+        showToast(
+          "Sample playlists cannot be modified. Please log in to create your own playlists.",
+          "info",
+        );
         return { success: false };
       }
 
@@ -833,16 +984,17 @@ const PlayerContextProvider = (props) => {
 
       try {
         // Optimistically update the local state first for instant UI update
-        setPlaylists(prevPlaylists => 
-          prevPlaylists.map(playlist => {
+        setPlaylists((prevPlaylists) =>
+          prevPlaylists.map((playlist) => {
             if (playlist._id === playlistId) {
               return {
                 ...playlist,
-                songs: playlist.songs?.filter(song => song._id !== songId) || []
+                songs:
+                  playlist.songs?.filter((song) => song._id !== songId) || [],
               };
             }
             return playlist;
-          })
+          }),
         );
 
         const response = await axios.post(`${url}/api/playlist/remove-song`, {
@@ -855,7 +1007,9 @@ const PlayerContextProvider = (props) => {
           try {
             const response = await axios.get(`${url}/api/playlist/list`);
             if (response.data.success) {
-              const pls = Array.isArray(response.data.playlists) ? response.data.playlists : [];
+              const pls = Array.isArray(response.data.playlists)
+                ? response.data.playlists
+                : [];
               setPlaylists(pls);
             }
           } catch (refreshError) {
@@ -868,7 +1022,9 @@ const PlayerContextProvider = (props) => {
           try {
             const response = await axios.get(`${url}/api/playlist/list`);
             if (response.data.success) {
-              const pls = Array.isArray(response.data.playlists) ? response.data.playlists : [];
+              const pls = Array.isArray(response.data.playlists)
+                ? response.data.playlists
+                : [];
               setPlaylists(pls);
             }
           } catch (refreshError) {
@@ -883,7 +1039,9 @@ const PlayerContextProvider = (props) => {
         try {
           const response = await axios.get(`${url}/api/playlist/list`);
           if (response.data.success) {
-            const pls = Array.isArray(response.data.playlists) ? response.data.playlists : [];
+            const pls = Array.isArray(response.data.playlists)
+              ? response.data.playlists
+              : [];
             setPlaylists(pls);
           }
         } catch (refreshError) {
@@ -895,7 +1053,7 @@ const PlayerContextProvider = (props) => {
         return { success: false, message };
       }
     },
-    [showToast, isAuthenticated]
+    [showToast, isAuthenticated],
   );
 
   // Data fetching
@@ -909,13 +1067,13 @@ const PlayerContextProvider = (props) => {
           ? response.data.data
           : []
         : Array.isArray(response.data)
-        ? response.data
-        : [];
+          ? response.data
+          : [];
 
       // If backend returned empty, fallback to local sample data
       if (!songs || songs.length === 0) {
         try {
-          const sampleModule = await import('../data/sampleData');
+          const sampleModule = await import("../data/sampleData");
           setSongsData(sampleModule.sampleSongs);
           if (!track && sampleModule.sampleSongs.length > 0) {
             setTrack(sampleModule.sampleSongs[0]);
@@ -923,7 +1081,7 @@ const PlayerContextProvider = (props) => {
           }
           return;
         } catch (impErr) {
-          console.warn('No sample songs available', impErr);
+          console.warn("No sample songs available", impErr);
         }
       }
 
@@ -937,14 +1095,14 @@ const PlayerContextProvider = (props) => {
       console.error("Error fetching songs:", error);
       // Fallback to sample data on error
       try {
-        const sampleModule = await import('../data/sampleData');
+        const sampleModule = await import("../data/sampleData");
         setSongsData(sampleModule.sampleSongs);
         if (!track && sampleModule.sampleSongs.length > 0) {
           setTrack(sampleModule.sampleSongs[0]);
           setCurrentPlaylist(sampleModule.sampleSongs);
         }
       } catch (impErr) {
-        console.error('No sample songs available', impErr);
+        console.error("No sample songs available", impErr);
         setSongsData([]);
       }
     }
@@ -956,16 +1114,16 @@ const PlayerContextProvider = (props) => {
       const albums = Array.isArray(response.data.allAlbums)
         ? response.data.allAlbums
         : Array.isArray(response.data)
-        ? response.data
-        : [];
+          ? response.data
+          : [];
 
       if (!albums || albums.length === 0) {
         try {
-          const sampleModule = await import('../data/sampleData');
+          const sampleModule = await import("../data/sampleData");
           setAlbumsData(sampleModule.sampleAlbums);
           return;
         } catch (impErr) {
-          console.warn('No sample albums available', impErr);
+          console.warn("No sample albums available", impErr);
         }
       }
 
@@ -973,10 +1131,10 @@ const PlayerContextProvider = (props) => {
     } catch (error) {
       console.error("Error fetching albums:", error);
       try {
-        const sampleModule = await import('../data/sampleData');
+        const sampleModule = await import("../data/sampleData");
         setAlbumsData(sampleModule.sampleAlbums);
       } catch (impErr) {
-        console.error('No sample albums available', impErr);
+        console.error("No sample albums available", impErr);
         setAlbumsData([]);
       }
     }
@@ -992,7 +1150,9 @@ const PlayerContextProvider = (props) => {
     try {
       const response = await axios.get(`${url}/api/playlist/list`);
       if (response.data.success) {
-        const pls = Array.isArray(response.data.playlists) ? response.data.playlists : [];
+        const pls = Array.isArray(response.data.playlists)
+          ? response.data.playlists
+          : [];
         setPlaylists(pls);
       } else {
         setPlaylists([]);
@@ -1028,7 +1188,11 @@ const PlayerContextProvider = (props) => {
         const recentlyPlayedData = Array.isArray(response.data.recentlyPlayed)
           ? response.data.recentlyPlayed
           : [];
-        console.log("✅ Recently played loaded:", recentlyPlayedData.length, "songs");
+        console.log(
+          "✅ Recently played loaded:",
+          recentlyPlayedData.length,
+          "songs",
+        );
         setRecentlyPlayed(recentlyPlayedData);
         return;
       }
@@ -1044,8 +1208,12 @@ const PlayerContextProvider = (props) => {
   const fetchRecommendationsAndTrending = useCallback(async () => {
     try {
       const [recRes, trendRes] = await Promise.all([
-        axios.get(`${url}/api/song/recommendations`).catch(() => ({ data: {} })),
-        axios.get(`${url}/api/song/trending?limit=10`).catch(() => ({ data: {} })),
+        axios
+          .get(`${url}/api/song/recommendations`)
+          .catch(() => ({ data: {} })),
+        axios
+          .get(`${url}/api/song/trending?limit=10`)
+          .catch(() => ({ data: {} })),
       ]);
 
       let recs = [];
@@ -1085,7 +1253,7 @@ const PlayerContextProvider = (props) => {
     getAlbumsData();
     getPlaylistsData();
     fetchRecommendationsAndTrending();
-    
+
     // Load user-specific data if authenticated
     if (isAuthenticated) {
       getLikedSongs();
@@ -1121,7 +1289,10 @@ const PlayerContextProvider = (props) => {
 
         socket.on("user_listening", (payload) => {
           setLiveListening((prev) => {
-            const next = [{ ...payload, at: Date.now() }, ...(prev || [])].slice(0, 5);
+            const next = [
+              { ...payload, at: Date.now() },
+              ...(prev || []),
+            ].slice(0, 5);
             return next;
           });
         });
@@ -1153,7 +1324,9 @@ const PlayerContextProvider = (props) => {
         audioElement.play();
       } else {
         // Auto-advance to next song in playlist
-        const safePlaylist = Array.isArray(currentPlaylist) ? currentPlaylist : [];
+        const safePlaylist = Array.isArray(currentPlaylist)
+          ? currentPlaylist
+          : [];
         if (safePlaylist.length > 0) {
           next();
         } else {
@@ -1219,12 +1392,11 @@ const PlayerContextProvider = (props) => {
         audioElement.removeEventListener("timeupdate", handleTimeUpdate);
         audioElement.removeEventListener(
           "loadedmetadata",
-          handleLoadedMetadata
+          handleLoadedMetadata,
         );
       }
     };
   }, [isRepeating, next, volume, currentPlaylist, user, emitStoppedListening]);
-
 
   // Sync audio src when track changes (not when volume changes - that would reload and stop playback)
   useEffect(() => {
@@ -1240,11 +1412,11 @@ const PlayerContextProvider = (props) => {
         setPlayStatus(false);
       }
     } else {
-      audioElement.removeAttribute('src');
+      audioElement.removeAttribute("src");
       audioElement.load();
       setPlayStatus(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- volume omitted: changing volume must not reload audio (stops playback)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- volume omitted: changing volume must not reload audio (stops playback)
   }, [track]);
 
   // Memoized context value to prevent unnecessary re-renders
@@ -1347,7 +1519,7 @@ const PlayerContextProvider = (props) => {
       removeSongFromPlaylist,
       getPlaylistsData,
       fetchRecommendationsAndTrending,
-    ]
+    ],
   );
 
   return (
@@ -1358,27 +1530,18 @@ const PlayerContextProvider = (props) => {
           audioRef.current = el;
           if (!el) return;
           el.onplay = () => {
-            const uid = userRef.current?._id ?? userRef.current?.id;
-            if (uid && socketRef.current) {
-              const userId = String(uid);
-              socketRef.current.emit("user_started_listening", userId);
-              console.log("Started listening:", userId);
-            }
+            emitStartedListening();
           };
+
           el.onpause = () => {
-            const uid = userRef.current?._id ?? userRef.current?.id;
-            if (uid && socketRef.current) {
-              socketRef.current.emit("user_stopped_listening", String(uid));
-            }
+            emitStoppedListening();
           };
+
           el.onended = () => {
-            const uid = userRef.current?._id ?? userRef.current?.id;
-            if (uid && socketRef.current) {
-              socketRef.current.emit("user_stopped_listening", String(uid));
-            }
+            emitStoppedListening();
           };
         }}
-        style={{ display: 'none' }}
+        style={{ display: "none" }}
         preload="auto"
       />
       {props.children}
@@ -1389,7 +1552,7 @@ const PlayerContextProvider = (props) => {
 export const usePlayer = () => {
   const context = useContext(PlayerContext);
   if (context === undefined) {
-    throw new Error('usePlayer must be used within a PlayerContextProvider');
+    throw new Error("usePlayer must be used within a PlayerContextProvider");
   }
   return context;
 };

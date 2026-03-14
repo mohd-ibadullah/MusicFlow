@@ -19,35 +19,60 @@ const LikedSongs = () => {
   const filteredLikedSongs = useMemo(() => {
     // Handle both cases: likedSongs as IDs or as full objects
     let likedSongsData;
-    
-    if (likedSongs.length > 0 && typeof likedSongs[0] === 'string') {
+
+    if (Array.isArray(likedSongs) && likedSongs.length > 0 && typeof likedSongs[0] === "string") {
       // If likedSongs contains IDs, filter songsData
-      likedSongsData = songsData.filter(song => song && likedSongs.includes(song._id));
+      likedSongsData = songsData.filter(
+        (song) => song && likedSongs.includes(song._id),
+      );
     } else {
       // If likedSongs contains full objects, use them directly
-      likedSongsData = likedSongs.filter(song => song && song._id);
+      likedSongsData = likedSongs.filter((song) => song && song._id);
     }
-    
-    let filtered = likedSongsData.filter(song => {
+
+    let filtered = likedSongsData.filter((song) => {
       if (!searchQuery) return true;
       const query = searchQuery.toLowerCase();
-      return song.name?.toLowerCase().includes(query) ||
+      return (
+        song.name?.toLowerCase().includes(query) ||
         song.desc?.toLowerCase().includes(query) ||
-        song.album?.toLowerCase().includes(query);
+        song.album?.toLowerCase().includes(query)
+      );
     });
     // Sort songs
+    // Sort songs
+    const sorted = [...filtered];
+
     switch (sortBy) {
       case "newest":
-        return filtered.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        sorted.sort((a, b) => {
+          const da = new Date(a.createdAt || a.playedAt || 0).getTime();
+          const db = new Date(b.createdAt || b.playedAt || 0).getTime();
+          return db - da;
+        });
+        break;
+
       case "oldest":
-        return filtered.slice().sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+        sorted.sort((a, b) => {
+          const da = new Date(a.createdAt || a.playedAt || 0).getTime();
+          const db = new Date(b.createdAt || b.playedAt || 0).getTime();
+          return da - db;
+        });
+        break;
+
       case "name":
-        return filtered.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        break;
+
       case "album":
-        return filtered.slice().sort((a, b) => (a.album || "").localeCompare(b.album || ""));
+        sorted.sort((a, b) => (a.album || "").localeCompare(b.album || ""));
+        break;
+
       default:
-        return filtered;
+        break;
     }
+
+    return sorted;
   }, [songsData, likedSongs, searchQuery, sortBy]);
 
   // Go back to previous page
@@ -59,7 +84,10 @@ const LikedSongs = () => {
   const handlePlayAll = () => {
     if (filteredLikedSongs.length > 0) {
       playWithId(filteredLikedSongs[0]._id, filteredLikedSongs);
-      showToast(`Playing all ${filteredLikedSongs.length} liked songs`, "success");
+      showToast(
+        `Playing all ${filteredLikedSongs.length} liked songs`,
+        "success",
+      );
     } else {
       showToast("No liked songs to play", "info");
     }
@@ -75,14 +103,27 @@ const LikedSongs = () => {
             className="btn-ghost p-2 rounded-lg border border-gray-200 dark:border-gray-700"
             title="Go back"
           >
-            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg
+              className="w-5 h-5 text-gray-600 dark:text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">Liked Songs</h1>
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
+              Liked Songs
+            </h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">
-              {filteredLikedSongs.length} {filteredLikedSongs.length === 1 ? 'song' : 'songs'} you love
+              {filteredLikedSongs.length}{" "}
+              {filteredLikedSongs.length === 1 ? "song" : "songs"} you love
             </p>
           </div>
         </div>
@@ -99,8 +140,18 @@ const LikedSongs = () => {
       {/* Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="relative flex-1 max-w-md">
-          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
           <input
             type="text"
@@ -123,8 +174,18 @@ const LikedSongs = () => {
             <option value="album">Album A-Z</option>
           </select>
           <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <svg
+              className="w-5 h-5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
             </svg>
           </div>
         </div>
@@ -136,7 +197,11 @@ const LikedSongs = () => {
       ) : filteredLikedSongs.length > 0 ? (
         <div className="songs-grid">
           {filteredLikedSongs.map((song, index) => (
-            <div key={song._id || index} className="animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
+            <div
+              key={song._id || index}
+              className="animate-slide-up"
+              style={{ animationDelay: `${index * 0.1}s` }}
+            >
               <SongCard song={song} playlist={filteredLikedSongs} />
             </div>
           ))}
@@ -144,20 +209,22 @@ const LikedSongs = () => {
       ) : (
         <div className="text-center py-16">
           <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Heart className="w-12 h-12 text-gray-500 dark:text-gray-400" aria-hidden />
+            <Heart
+              className="w-12 h-12 text-gray-500 dark:text-gray-400"
+              aria-hidden
+            />
           </div>
           <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-            {searchQuery ? 'No liked songs found' : 'No liked songs yet'}
+            {searchQuery ? "No liked songs found" : "No liked songs yet"}
           </h3>
           <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-md mx-auto">
-            {searchQuery 
+            {searchQuery
               ? `No liked songs match your search "${searchQuery}"`
-              : 'Start liking songs to see them here. Click the heart icon on any song to add it to your liked songs.'
-            }
+              : "Start liking songs to see them here. Click the heart icon on any song to add it to your liked songs."}
           </p>
           {!searchQuery && (
             <button
-              onClick={() => navigate('/songs')}
+              onClick={() => navigate("/songs")}
               className="btn-primary px-8"
             >
               Explore Songs

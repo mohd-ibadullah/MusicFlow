@@ -8,16 +8,16 @@ import * as songService from "../services/songService.js";
 export const addSong = async (req, res) => {
   try {
     const { name, description, album, artist, genre } = req.body;
-    
-    if (!req.files || !req.files['image'] || !req.files['audio']) {
+
+    if (!req.files || !req.files["image"] || !req.files["audio"]) {
       return res.status(400).json({
         success: false,
-        message: "Image and audio files are required"
+        message: "Image and audio files are required",
       });
     }
-    
-    const imageFile = req.files['image'][0].path;
-    const audioFile = req.files['audio'][0].path;
+
+    const imageFile = req.files["image"][0].path;
+    const audioFile = req.files["audio"][0].path;
 
     console.log("📥 Adding song:", { name, description, album });
 
@@ -37,7 +37,7 @@ export const addSong = async (req, res) => {
       console.error("❌ Cloudinary upload error:", cloudinaryError);
       return res.status(400).json({
         success: false,
-        message: "File upload failed. Please check your files and try again."
+        message: "File upload failed. Please check your files and try again.",
       });
     }
 
@@ -48,8 +48,10 @@ export const addSong = async (req, res) => {
       const fileSizeInMB = stats.size / (1024 * 1024);
       // Rough estimate: 1MB ≈ 1 minute for MP3
       const estimatedMinutes = Math.max(1, Math.round(fileSizeInMB));
-      const estimatedSeconds = Math.round((fileSizeInMB - Math.floor(fileSizeInMB)) * 60);
-      duration = `${estimatedMinutes}:${estimatedSeconds.toString().padStart(2, '0')}`;
+      const estimatedSeconds = Math.round(
+        (fileSizeInMB - Math.floor(fileSizeInMB)) * 60,
+      );
+      duration = `${estimatedMinutes}:${estimatedSeconds.toString().padStart(2, "0")}`;
       console.log("🎵 Estimated duration:", duration);
     } catch (durationError) {
       console.warn("⚠️ Could not estimate duration:", durationError.message);
@@ -58,13 +60,13 @@ export const addSong = async (req, res) => {
     const songData = {
       name: name || "Unknown Song",
       desc: description || "No description",
-      album: album === "none" ? "Single" : (album || "Unknown Album"),
+      album: album === "none" ? "Single" : album || "Unknown Album",
       artist: artist || "",
       genre: genre || "",
       image: imageUpload.secure_url,
       file: audioUpload.secure_url,
       duration: duration,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
 
     const song = new Song(songData);
@@ -80,63 +82,119 @@ export const addSong = async (req, res) => {
       console.warn("⚠️ Could not clean up temp files:", cleanupError.message);
     }
 
-    console.log("✅ Song added successfully:", { 
-      id: song._id, 
-      name: song.name, 
-      duration: song.duration 
+    console.log("✅ Song added successfully:", {
+      id: song._id,
+      name: song.name,
+      duration: song.duration,
     });
-    
-    return res.status(200).json({ 
+
+    return res.status(200).json({
       success: true,
-      message: "Song added successfully", 
-      song 
+      message: "Song added successfully",
+      song,
     });
-    
   } catch (error) {
     console.error("❌ Add song error:", error);
-    
+
     // Clean up temp files on error
     try {
-      if (req.files?.['image']?.[0]?.path) fs.unlinkSync(req.files['image'][0].path);
-      if (req.files?.['audio']?.[0]?.path) fs.unlinkSync(req.files['audio'][0].path);
+      if (req.files?.["image"]?.[0]?.path)
+        fs.unlinkSync(req.files["image"][0].path);
+      if (req.files?.["audio"]?.[0]?.path)
+        fs.unlinkSync(req.files["audio"][0].path);
     } catch (cleanupError) {
-      console.warn("⚠️ Could not clean up temp files on error:", cleanupError.message);
+      console.warn(
+        "⚠️ Could not clean up temp files on error:",
+        cleanupError.message,
+      );
     }
-    
-    return res.status(500).json({ 
+
+    return res.status(500).json({
       success: false,
-      message: "Error adding song to database", 
-      error: error.message 
+      message: "Error adding song to database",
+      error: error.message,
     });
   }
 };
 
 export const listSong = async (req, res) => {
   try {
-    const cached = await cacheGet(CACHE_KEYS.SONGS_LIST);
-    if (cached) {
-      return res.status(200).json({
-        success: true,
-        data: cached.data,
-        count: cached.count,
+    const { language, artist, duration, popularity, sort } = req.query;
+
+    let filter = {};
+
+    if (language && language !== "all") {
+      filter.language = language;
+    }
+
+    if (artist && artist !== "all") {
+      filter.artist = artist;
+    }
+
+    let songs = await Song.find(filter).lean();
+
+    // Duration filter
+    if (duration === "short") {
+      songs = songs.filter((s) => {
+        const mins = parseInt(s.duration?.split(":")[0] || 0);
+        return mins < 3;
       });
     }
-    const songs = await Song.find({}).sort({ createdAt: -1 }).lean();
-    await cacheSet(CACHE_KEYS.SONGS_LIST, { data: songs, count: songs.length }, 120);
-    console.log("🎵 Songs found:", songs.length);
-    if (songs.length === 0) {
-      console.warn("⚠️ No songs returned from MongoDB. Collection may be empty or the database URI is incorrect.");
+
+    if (duration === "medium") {
+      songs = songs.filter((s) => {
+        const mins = parseInt(s.duration?.split(":")[0] || 0);
+        return mins >= 3 && mins <= 5;
+      });
     }
+
+    if (duration === "long") {
+      songs = songs.filter((s) => {
+        const mins = parseInt(s.duration?.split(":")[0] || 0);
+        return mins > 5;
+      });
+    }
+
+    // Popularity filter
+    if (popularity === "high") {
+      songs = songs.filter((s) => (s.playCount || 0) >= 10);
+    }
+
+    if (popularity === "low") {
+      songs = songs.filter((s) => (s.playCount || 0) < 10);
+    }
+
+    // Sorting
+    if (sort === "newest") {
+      songs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    if (sort === "oldest") {
+      songs.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    }
+
+    if (sort === "name") {
+      songs.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    if (sort === "album") {
+      songs.sort((a, b) => (a.album || "").localeCompare(b.album || ""));
+    }
+
+    if (sort === "popular") {
+      songs.sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
+    }
+
     res.status(200).json({
       success: true,
       data: songs,
-      count: songs.length
+      count: songs.length,
     });
   } catch (error) {
     console.error("List songs error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Error fetching songs" 
+      message: "Error fetching songs",
     });
   }
 };
@@ -145,22 +203,22 @@ export const removeSong = async (req, res) => {
   try {
     const result = await Song.findByIdAndDelete(req.body.id);
     if (!result) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "Song not found" 
+        message: "Song not found",
       });
     }
     await cacheDel(CACHE_KEYS.SONGS_LIST);
     await cacheDel(CACHE_KEYS.TRENDING);
-    res.status(200).json({ 
+    res.status(200).json({
       success: true,
-      message: "Song deleted successfully" 
+      message: "Song deleted successfully",
     });
   } catch (error) {
     console.error("Remove song error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Error deleting song" 
+      message: "Error deleting song",
     });
   }
 };
@@ -169,39 +227,39 @@ export const likeSong = async (req, res) => {
   try {
     const { songId } = req.body;
     const userId = req.user?.userId; // Get user ID from auth middleware
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
       });
     }
 
     if (!songId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Song ID is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Song ID is required",
       });
     }
 
     // Import User model
     const User = (await import("../models/userModel.js")).default;
-    
+
     // Check if song exists
     const song = await Song.findById(songId);
     if (!song) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Song not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Song not found",
       });
     }
 
     // Add song to user's liked songs if not already liked
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
 
@@ -212,15 +270,15 @@ export const likeSong = async (req, res) => {
       await Song.findByIdAndUpdate(songId, { $inc: { likeCount: 1 } });
     }
 
-    res.status(200).json({ 
-      success: true, 
-      message: "Song liked successfully" 
+    res.status(200).json({
+      success: true,
+      message: "Song liked successfully",
     });
   } catch (error) {
     console.error("Like song error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Error liking song" 
+    res.status(500).json({
+      success: false,
+      message: "Error liking song",
     });
   }
 };
@@ -229,47 +287,47 @@ export const unlikeSong = async (req, res) => {
   try {
     const { songId } = req.body;
     const userId = req.user?.userId; // Get user ID from auth middleware
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
       });
     }
 
     if (!songId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Song ID is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Song ID is required",
       });
     }
 
     // Import User model
     const User = (await import("../models/userModel.js")).default;
-    
+
     // Remove song from user's liked songs
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
 
-    user.likedSongs = user.likedSongs.filter(id => id.toString() !== songId);
+    user.likedSongs = user.likedSongs.filter((id) => id.toString() !== songId);
     await user.save();
     // Decrement song likeCount (ensure non-negative via aggregation when needed)
     await Song.findByIdAndUpdate(songId, { $inc: { likeCount: -1 } });
 
     res.status(200).json({
       success: true,
-      message: "Song unliked successfully"
+      message: "Song unliked successfully",
     });
   } catch (error) {
     console.error("Unlike song error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Error unliking song" 
+    res.status(500).json({
+      success: false,
+      message: "Error unliking song",
     });
   }
 };
@@ -278,30 +336,30 @@ export const addToRecentlyPlayed = async (req, res) => {
   try {
     const { songId } = req.body;
     const userId = req.user?.userId; // Get user ID from auth middleware
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
       });
     }
 
     if (!songId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Song ID is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Song ID is required",
       });
     }
 
     // Import User model
     const User = (await import("../models/userModel.js")).default;
-    
+
     // Check if song exists
     const song = await Song.findById(songId);
     if (!song) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Song not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Song not found",
       });
     }
 
@@ -311,24 +369,26 @@ export const addToRecentlyPlayed = async (req, res) => {
     // Get user and update recently played
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
 
     // Remove song if already in recently played (and clean up any null references)
-    user.recentlyPlayed = user.recentlyPlayed.filter(item => item.song && item.song.toString() !== songId);
-    
+    user.recentlyPlayed = user.recentlyPlayed.filter(
+      (item) => item.song && item.song.toString() !== songId,
+    );
+
     // Add song to beginning of recently played
     user.recentlyPlayed.unshift({
       song: songId,
-      playedAt: new Date()
+      playedAt: new Date(),
     });
 
     // Keep only last 5 songs
     user.recentlyPlayed = user.recentlyPlayed.slice(0, 5);
-    
+
     await user.save();
 
     // Real-time: broadcast that this user is listening (for live activity UI)
@@ -346,15 +406,15 @@ export const addToRecentlyPlayed = async (req, res) => {
       console.warn("Socket emit error:", emitErr.message);
     }
 
-    res.status(200).json({ 
-      success: true, 
-      message: "Song added to recently played" 
+    res.status(200).json({
+      success: true,
+      message: "Song added to recently played",
     });
   } catch (error) {
     console.error("Add to recently played error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Error adding to recently played" 
+    res.status(500).json({
+      success: false,
+      message: "Error adding to recently played",
     });
   }
 };
@@ -362,35 +422,35 @@ export const addToRecentlyPlayed = async (req, res) => {
 export const getLikedSongs = async (req, res) => {
   try {
     const userId = req.user?.userId; // Get user ID from auth middleware
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
       });
     }
 
     // Import User model
     const User = (await import("../models/userModel.js")).default;
-    
+
     // Get user with populated liked songs
-    const user = await User.findById(userId).populate('likedSongs');
+    const user = await User.findById(userId).populate("likedSongs");
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
 
-    res.status(200).json({ 
-      success: true, 
-      likedSongs: user.likedSongs || [] 
+    res.status(200).json({
+      success: true,
+      likedSongs: user.likedSongs || [],
     });
   } catch (error) {
     console.error("Get liked songs error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Error fetching liked songs" 
+    res.status(500).json({
+      success: false,
+      message: "Error fetching liked songs",
     });
   }
 };
@@ -398,44 +458,44 @@ export const getLikedSongs = async (req, res) => {
 export const getRecentlyPlayed = async (req, res) => {
   try {
     const userId = req.user?.userId; // Get user ID from auth middleware
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
       });
     }
 
     // Import User model
     const User = (await import("../models/userModel.js")).default;
-    
+
     // Get user with populated recently played songs
-    const user = await User.findById(userId).populate('recentlyPlayed.song');
+    const user = await User.findById(userId).populate("recentlyPlayed.song");
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
 
     // Sort by playedAt date (most recent first) and include playedAt timestamp
     const recentlyPlayed = user.recentlyPlayed
-      .filter(item => item.song !== null && item.song !== undefined) // Remove null songs first
+      .filter((item) => item.song !== null && item.song !== undefined) // Remove null songs first
       .sort((a, b) => new Date(b.playedAt) - new Date(a.playedAt))
-      .map(item => ({
+      .map((item) => ({
         ...item.song.toObject(),
-        playedAt: item.playedAt
+        playedAt: item.playedAt,
       }));
 
-    res.status(200).json({ 
-      success: true, 
-      recentlyPlayed: recentlyPlayed || [] 
+    res.status(200).json({
+      success: true,
+      recentlyPlayed: recentlyPlayed || [],
     });
   } catch (error) {
     console.error("Get recently played error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Error fetching recently played songs" 
+    res.status(500).json({
+      success: false,
+      message: "Error fetching recently played songs",
     });
   }
 };
@@ -448,7 +508,9 @@ export const getRecentlyPlayed = async (req, res) => {
 export const getRecommendations = async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const cacheKey = CACHE_KEYS.RECOMMENDATIONS(userId ? userId.toString() : "anon");
+    const cacheKey = CACHE_KEYS.RECOMMENDATIONS(
+      userId ? userId.toString() : "anon",
+    );
     const cached = await cacheGet(cacheKey);
     if (cached) {
       return res.status(200).json({
@@ -457,8 +519,14 @@ export const getRecommendations = async (req, res) => {
         count: cached.count,
       });
     }
-    const recommended = await songService.getRecommendations({ userId: userId?.toString() });
-    await cacheSet(cacheKey, { recommendations: recommended, count: recommended.length }, 60);
+    const recommended = await songService.getRecommendations({
+      userId: userId?.toString(),
+    });
+    await cacheSet(
+      cacheKey,
+      { recommendations: recommended, count: recommended.length },
+      60,
+    );
     res.status(200).json({
       success: true,
       recommendations: recommended,
@@ -500,6 +568,48 @@ export const getTrendingSongs = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching trending songs",
+    });
+  }
+};
+
+export const getArtists = async (req, res) => {
+  try {
+    const artists = await Song.distinct("artist");
+    res.status(200).json({
+      success: true,
+      artists,
+    });
+  } catch (error) {
+    console.error("Get artists error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching artists",
+    });
+  }
+};
+
+export const incrementPlayCount = async (req, res) => {
+  try {
+    const { songId } = req.params;
+
+    if (!songId) {
+      return res.status(400).json({
+        success: false,
+        message: "Song ID is required",
+      });
+    }
+
+    await Song.findByIdAndUpdate(songId, { $inc: { playCount: 1 } });
+
+    res.status(200).json({
+      success: true,
+      message: "Play count updated",
+    });
+  } catch (error) {
+    console.error("Increment play count error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating play count",
     });
   }
 };
