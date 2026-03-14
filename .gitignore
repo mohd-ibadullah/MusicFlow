@@ -1,0 +1,58 @@
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+*.env
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+*/dist/
+*/build/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+.cache/
+
+# Local development
+*.local
+.vercel
+.netlify
+.railway
+
