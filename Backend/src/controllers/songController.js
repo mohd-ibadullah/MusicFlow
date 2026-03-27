@@ -309,11 +309,16 @@ export const unlikeSong = async (req, res) => {
       });
     }
 
+    const wasLiked = user.likedSongs.some((id) => id.toString() === songId);
     user.likedSongs = user.likedSongs.filter((id) => id.toString() !== songId);
     await user.save();
-    await Song.findByIdAndUpdate(songId, [
-      { $set: { likeCount: { $max: [{ $subtract: ["$likeCount", 1] }, 0] } } },
-    ]);
+
+    // Only decrement likeCount if the song was actually in the user's liked list
+    if (wasLiked) {
+      await Song.findByIdAndUpdate(songId, [
+        { $set: { likeCount: { $max: [{ $subtract: ["$likeCount", 1] }, 0] } } },
+      ]);
+    }
 
     res.status(200).json({
       success: true,
