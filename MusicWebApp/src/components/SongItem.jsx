@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { Play, Pause, Heart } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 import { useToast } from "../context/ThemeContext";
@@ -36,7 +36,6 @@ const SongItem = ({ image, name, desc, artist, language, id, duration, album, pl
   const { showToast } = useToast();
   const [isHovered, setIsHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
 
   // Validate and fallback song data
@@ -69,10 +68,7 @@ const SongItem = ({ image, name, desc, artist, language, id, duration, album, pl
         return;
       }
       
-      setIsLoading(true);
-      
       try {
-        // If already playing, pause; else play this song
         if (isCurrentlyPlaying) {
           pause();
           showToast(`Paused: ${safeName}`, "info");
@@ -83,9 +79,6 @@ const SongItem = ({ image, name, desc, artist, language, id, duration, album, pl
       } catch (error) {
         console.error('Play error:', error);
         showToast("Failed to play song", "error");
-      } finally {
-        // Reset loading state after a short delay
-        setTimeout(() => setIsLoading(false), 500);
       }
     },
     [safeId, safeName, isCurrentlyPlaying, playWithId, songsData, playlist, pause, showToast]
@@ -125,27 +118,6 @@ const SongItem = ({ image, name, desc, artist, language, id, duration, album, pl
     setImgError(true);
   }, []);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      setIsLoading(false);
-      setIsHovered(false);
-    };
-  }, []);
-
-  // Loading indicator
-  if (isLoading) {
-    return (
-      <div className="animate-pulse bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-        <div className="rounded-xl mb-4 aspect-square bg-gray-200 dark:bg-gray-700" />
-        <div className="space-y-2">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       onMouseEnter={() => setIsHovered(true)}
@@ -156,7 +128,7 @@ const SongItem = ({ image, name, desc, artist, language, id, duration, album, pl
       aria-label={`Song: ${safeName} by ${safeArtistLanguage}`}
       className={`group relative rounded-xl p-5 bg-white dark:bg-gray-800/90 border border-gray-100 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 ${
         !safeId ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-      } ${isLoading ? "animate-pulse" : ""}`}
+      }`}
     >
       <div className="relative overflow-hidden rounded-xl mb-3 aspect-square shadow-inner">
         <img

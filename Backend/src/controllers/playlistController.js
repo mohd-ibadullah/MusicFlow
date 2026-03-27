@@ -20,7 +20,6 @@ export const createPlaylist = async (req, res) => {
     });
     await playlist.save();
     
-    console.log(`✅ Playlist created for user ${userId}:`, name);
     res.status(201).json({ success: true, playlist });
   } catch (error) {
     console.error("Error creating playlist:", error);
@@ -39,9 +38,7 @@ export const getPlaylists = async (req, res) => {
       });
     }
     
-    console.log(`Fetching playlists for user: ${userId}`);
     const playlists = await Playlist.find({ user: userId }).populate('songs');
-    console.log(`Found ${playlists.length} playlists for user ${userId}`);
     res.status(200).json({ success: true, playlists });
   } catch (error) {
     console.error("Error fetching playlists:", error);
@@ -95,13 +92,10 @@ export const addSongToPlaylist = async (req, res) => {
       });
     }
     
-    console.log("Adding song to playlist:", { playlistId, songId, userId });
-    
     const playlist = await Playlist.findOne({ _id: playlistId, user: userId });
     const song = await Song.findById(songId);
     
     if (!playlist) {
-      console.log("Playlist not found or access denied:", playlistId);
       return res.status(404).json({ 
         success: false, 
         message: "Playlist not found or access denied" 
@@ -109,19 +103,14 @@ export const addSongToPlaylist = async (req, res) => {
     }
     
     if (!song) {
-      console.log("Song not found:", songId);
       return res.status(404).json({ success: false, message: "Song not found" });
     }
 
-    // Check if song already exists in playlist
     const songExists = playlist.songs.some(song => song.toString() === songId);
     
     if (!songExists) {
       playlist.songs.push(songId);
       await playlist.save();
-      console.log("Song added to playlist successfully");
-    } else {
-      console.log("Song already exists in playlist");
     }
 
     const updatedPlaylist = await Playlist.findById(playlistId).populate('songs');
@@ -144,18 +133,14 @@ export const deletePlaylist = async (req, res) => {
       });
     }
     
-    console.log("Deleting playlist:", id, "for user:", userId);
-    
     const playlist = await Playlist.findOneAndDelete({ _id: id, user: userId });
     if (!playlist) {
-      console.log("Playlist not found for deletion or access denied:", id);
       return res.status(404).json({ 
         success: false, 
         message: "Playlist not found or access denied" 
       });
     }
     
-    console.log("Playlist deleted successfully:", id);
     res.status(200).json({ success: true, message: "Playlist deleted successfully" });
   } catch (error) {
     console.error("Error deleting playlist:", error);
@@ -175,29 +160,23 @@ export const removeSongFromPlaylist = async (req, res) => {
       });
     }
     
-    console.log("Removing song from playlist:", { playlistId, songId, userId });
-    
     const playlist = await Playlist.findOne({ _id: playlistId, user: userId });
     
     if (!playlist) {
-      console.log("Playlist not found for removal or access denied:", playlistId);
       return res.status(404).json({ 
         success: false, 
         message: "Playlist not found or access denied" 
       });
     }
 
-    // Remove the song from the playlist
     const initialLength = playlist.songs.length;
     playlist.songs = playlist.songs.filter(song => song.toString() !== songId);
     
     if (playlist.songs.length === initialLength) {
-      console.log("Song not found in playlist for removal:", songId);
       return res.status(404).json({ success: false, message: "Song not found in playlist" });
     }
     
     await playlist.save();
-    console.log("Song removed from playlist successfully");
 
     const updatedPlaylist = await Playlist.findById(playlistId).populate('songs');
     res.status(200).json({ success: true, playlist: updatedPlaylist });
@@ -252,30 +231,10 @@ function generatePlaylistName(prompt) {
   return `${words[0]?.charAt(0).toUpperCase() + words[0]?.slice(1) || 'Custom'} Playlist`;
 }
 
-// Test function
-export const testPlaylist = async (req, res) => {
-  try {
-    console.log("✅ Playlist test endpoint hit successfully!");
-    res.status(200).json({ 
-      success: true, 
-      message: "Playlist backend is working!",
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Cleanup old playlists without user field
+// Cleanup old playlists without user field (admin only)
 export const cleanupOldPlaylists = async (req, res) => {
   try {
-    console.log("🧹 Cleaning up old playlists without user field...");
-    
-    // Delete all playlists that don't have a user field
     const result = await Playlist.deleteMany({ user: { $exists: false } });
-    
-    console.log(`✅ Deleted ${result.deletedCount} old playlists`);
-    
     res.status(200).json({ 
       success: true, 
       message: `Deleted ${result.deletedCount} old playlists without user field`,
@@ -330,11 +289,7 @@ export const generatePlaylist = async (req, res) => {
       });
     }
     
-    console.log(`Generating playlist for user ${userId} with prompt: "${prompt}"`);
-    
-    // Simple AI-like keyword extraction and matching
     const keywords = extractKeywords(prompt.toLowerCase());
-    console.log("Extracted keywords:", keywords);
     
     // Find matching songs
     const matchingSongs = await findSongsByKeywords(keywords);
@@ -358,8 +313,6 @@ export const generatePlaylist = async (req, res) => {
     
     await playlist.save();
     await playlist.populate('songs');
-    
-    console.log(`✅ AI playlist generated: ${playlistName} with ${playlist.songs.length} songs`);
     
     res.status(201).json({ 
       success: true, 

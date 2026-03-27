@@ -13,20 +13,19 @@ const MobileSidebar = ({ isOpen, onClose }) => {
   const { isDark } = useTheme();
   const { user, isAuthenticated, logout } = useAuth();
 
-  // Only show functional menu items that have data or purpose
   const mainMenu = [
-    { id: 'home', path: '/', label: 'Home', Icon: Home, functional: true },
-    { id: 'search', path: '/search', label: 'Search', Icon: Search, functional: true },
-    { id: 'songs', path: '/songs', label: 'All Songs', Icon: Headphones, functional: songsData.length > 0 },
-    { id: 'library', path: '/library', label: 'Your Library', Icon: Library, functional: songsData.length > 0 },
-  ].filter(item => item.functional);
+    { id: 'home', path: '/', label: 'Home', Icon: Home },
+    { id: 'search', path: '/search', label: 'Search', Icon: Search },
+    { id: 'songs', path: '/songs', label: 'All Songs', Icon: Headphones },
+    { id: 'library', path: '/library', label: 'Your Library', Icon: Library },
+  ];
 
   const libraryMenu = [
-    { id: 'recent', path: '/recent', label: 'Recently Played', Icon: Clock, count: recentlyPlayed.length, functional: recentlyPlayed.length > 0 },
-    { id: 'liked', path: '/liked', label: 'Liked Songs', Icon: Heart, count: likedSongs.length, functional: likedSongs.length > 0 },
-    { id: 'playlists', path: '/playlists', label: 'Playlists', Icon: Music2, count: playlists.length, functional: playlists.length > 0 },
-    { id: 'albums', path: '/albums', label: 'Albums', Icon: Disc, count: albumsData.length, functional: albumsData.length > 0 },
-  ].filter(item => item.functional);
+    { id: 'recent', path: '/recent', label: 'Recently Played', Icon: Clock, count: recentlyPlayed.length },
+    { id: 'liked', path: '/liked', label: 'Liked Songs', Icon: Heart, count: likedSongs.length },
+    { id: 'playlists', path: '/playlists', label: 'Playlists', Icon: Music2, count: playlists.length },
+    { id: 'albums', path: '/albums', label: 'Albums', Icon: Disc, count: albumsData.length },
+  ];
 
   const handleCreatePlaylist = () => {
     setShowPlaylistModal(true);

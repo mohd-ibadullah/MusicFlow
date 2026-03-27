@@ -7,18 +7,14 @@ import {
   deletePlaylist,
   removeSongFromPlaylist,
   generatePlaylist,
-  testPlaylist,
   cleanupOldPlaylists
 } from "../controllers/playlistController.js";
-import { authenticateToken } from "../middleware/authMiddleware.js";
+import { authenticateToken, authorizeAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Test endpoint (public)
-router.get("/test", testPlaylist);
-
-// Cleanup endpoint (public - for migration)
-router.delete("/cleanup-old", cleanupOldPlaylists);
+// Cleanup endpoint (admin only)
+router.delete("/cleanup-old", authenticateToken, authorizeAdmin, cleanupOldPlaylists);
 
 // CRUD operations (all require authentication)
 router.post("/create", authenticateToken, createPlaylist);
