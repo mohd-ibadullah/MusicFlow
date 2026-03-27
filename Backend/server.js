@@ -13,6 +13,12 @@ const envPath = path.resolve(__dirname, "../.env");
 console.log("ℹ️ loading env from", envPath);
 dotenv.config({ path: envPath });
 
+// Fail fast if required secrets are missing
+if (!process.env.JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET environment variable is not set. Refusing to start.");
+  process.exit(1);
+}
+
 import { Server } from "socket.io";
 import songRouter from "./src/routes/songRouter.js";
 import connectDB from "./src/config/mongodb.js";
