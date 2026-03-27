@@ -23,6 +23,7 @@ const PlayerContextProvider = (props) => {
   const seekBar = useRef();
   const { user, isAuthenticated } = useAuth();
   const lastPlayCountedRef = useRef({ songId: null, at: 0 });
+  const playStatusRef = useRef(false);
   const userRef = useRef(user);
   const socketRef = useRef(null);
   // Unique listener ID (works for both logged-in users and guests)
@@ -53,107 +54,14 @@ const PlayerContextProvider = (props) => {
   const [songsData, setSongsData] = useState([]);
   const [albumsData, setAlbumsData] = useState([]);
   const [playlists, setPlaylists] = useState([]);
-  // Load data from backend or fallback to sample data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Try to fetch from backend with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-        const requests = [
-          axios
-            .get(`${url}/api/song/list`, { signal: controller.signal })
-            .catch(() => ({ data: [] })),
-          axios
-            .get(`${url}/api/album/list`, { signal: controller.signal })
-            .catch(() => ({ data: [] })),
-        ];
-        // Only attempt authenticated playlists fetch when user is logged in
-        if (isAuthenticated) {
-          requests.push(
-            axios
-              .get(`${url}/api/playlist/list`, { signal: controller.signal })
-              .catch(() => ({ data: {} })),
-          );
-        }
-
-        const [songsRes, albumsRes, playlistsResRaw] =
-          await Promise.all(requests);
-
-        clearTimeout(timeoutId);
-
-        // Debug backend responses
-        console.log(
-          "Backend songs response structure:",
-          Object.keys(songsRes.data || {}),
-        );
-        console.log(
-          "Backend albums response structure:",
-          Object.keys(albumsRes.data || {}),
-        );
-        console.log(
-          "Backend playlists response structure:",
-          Object.keys(playlistsResRaw?.data || {}),
-        );
-
-        // Use backend data if available, otherwise use sample data
-        // Handle different backend response structures
-        const finalSongs =
-          Array.isArray(songsRes.data?.data) && songsRes.data.data.length > 0
-            ? songsRes.data.data
-            : Array.isArray(songsRes.data) && songsRes.data.length > 0
-              ? songsRes.data
-              : sampleSongs;
-
-        const finalAlbums =
-          Array.isArray(albumsRes.data?.allAlbums) &&
-          albumsRes.data.allAlbums.length > 0
-            ? albumsRes.data.allAlbums
-            : Array.isArray(albumsRes.data) && albumsRes.data.length > 0
-              ? albumsRes.data
-              : sampleAlbums;
-
-        let finalPlaylists = [];
-        if (isAuthenticated && playlistsResRaw) {
-          const playlistsRes = playlistsResRaw;
-          finalPlaylists =
-            Array.isArray(playlistsRes.data?.playlists) &&
-            playlistsRes.data.playlists.length > 0
-              ? playlistsRes.data.playlists
-              : Array.isArray(playlistsRes.data) && playlistsRes.data.length > 0
-                ? playlistsRes.data
-                : [];
-        }
-
-        console.log(
-          "Data loaded - Songs:",
-          finalSongs.length,
-          "Albums:",
-          finalAlbums.length,
-          "Playlists:",
-          finalPlaylists.length,
-        );
-
-        setSongsData(finalSongs);
-        setAlbumsData(finalAlbums);
-        setPlaylists(finalPlaylists);
-      } catch (err) {
-        console.log("Backend not available, using sample data:", err.message);
-        // Use sample data as fallback
-        setSongsData(sampleSongs);
-        setAlbumsData(sampleAlbums);
-        setPlaylists([]);
-      }
-    };
-    fetchData();
-  }, []);
 
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
 
   // Player state
   const [track, setTrack] = useState(null);
   const [playStatus, setPlayStatus] = useState(false);
+  // Keep a ref in sync so closures always read the live value
+  useEffect(() => { playStatusRef.current = playStatus; }, [playStatus]);
   const [time, setTime] = useState({
     currentTime: { second: 0, minute: 0 },
     totalTime: { second: 0, minute: 0 },
@@ -251,39 +159,26 @@ const PlayerContextProvider = (props) => {
   const addToRecentlyPlayed = useCallback(async (song) => {
     if (!song?._id) return;
 
-    // Optimistic update - update UI immediately
+    // Capture the current state before the optimistic update so we can restore it exactly on failure
+    let previousState;
     setRecentlyPlayed((prev) => {
-      const safePrev = Array.isArray(prev) ? prev : [];
-      // Remove any existing entry for this song
-      const filtered = safePrev.filter((item) => item && item._id !== song._id);
-      // Add playedAt timestamp to the song copy (matches backend format)
+      previousState = Array.isArray(prev) ? prev : [];
+      const filtered = previousState.filter((item) => item && item._id !== song._id);
       const songWithTime = { ...song, playedAt: new Date().toISOString() };
-      // Keep most recent first and cap to 5 entries
       return [songWithTime, ...filtered].slice(0, 5);
     });
 
     try {
-      // Update backend
       const response = await axios.post(`${url}/api/song/recently-played`, {
         songId: song._id,
       });
 
       if (!response.data.success) {
-        // Revert optimistic update on failure
-        setRecentlyPlayed((prev) => {
-          const safePrev = Array.isArray(prev) ? prev : [];
-          // Remove the song we just added
-          return safePrev.filter((item) => item && item._id !== song._id);
-        });
+        setRecentlyPlayed(previousState);
       }
     } catch (error) {
       console.error("Error adding to recently played:", error);
-      // Revert optimistic update on error
-      setRecentlyPlayed((prev) => {
-        const safePrev = Array.isArray(prev) ? prev : [];
-        // Remove the song we just added
-        return safePrev.filter((item) => item && item._id !== song._id);
-      });
+      setRecentlyPlayed(previousState);
     }
   }, []);
 
@@ -443,9 +338,9 @@ const PlayerContextProvider = (props) => {
           audioRef.current.addEventListener("canplay", handleCanPlay);
           audioRef.current.addEventListener("error", handleError);
 
-          // Fallback timeout
+          // Fallback timeout — use ref to read live playStatus, not the stale closure value
           setTimeout(() => {
-            if (!playStatus) {
+            if (!playStatusRef.current) {
               audioRef.current.removeEventListener("canplay", handleCanPlay);
               audioRef.current.removeEventListener("error", handleError);
               showToast(
@@ -464,7 +359,6 @@ const PlayerContextProvider = (props) => {
       getSafeSongsData,
       addToRecentlyPlayed,
       showToast,
-      playStatus,
       emitStartedListening,
     ],
   );
@@ -493,8 +387,12 @@ const PlayerContextProvider = (props) => {
     if (safePlaylist.length === 0) return;
 
     let nextIndex;
-    if (isShuffled) {
-      nextIndex = Math.floor(Math.random() * safePlaylist.length);
+    if (isShuffled && safePlaylist.length > 1) {
+      // Exclude current index so a different song is always selected
+      nextIndex = Math.floor(Math.random() * (safePlaylist.length - 1));
+      if (nextIndex >= currentPlaylistIndex) nextIndex++;
+    } else if (isShuffled) {
+      nextIndex = 0;
     } else {
       nextIndex = (currentPlaylistIndex + 1) % safePlaylist.length;
     }
@@ -505,19 +403,29 @@ const PlayerContextProvider = (props) => {
       setTrack(nextSong);
       addToRecentlyPlayed(nextSong);
 
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          play();
-        }
-      }, 100);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.src = nextSong.file || nextSong.url || nextSong.src || nextSong.audio || "";
+        audioRef.current.load();
+        const handleCanPlay = () => {
+          audioRef.current.removeEventListener("canplay", handleCanPlay);
+          audioRef.current.play()
+            .then(() => {
+              setPlayStatus(true);
+              emitStartedListening();
+            })
+            .catch((err) => console.error("next() play error:", err));
+        };
+        audioRef.current.addEventListener("canplay", handleCanPlay);
+      }
     }
   }, [
     currentPlaylist,
     currentPlaylistIndex,
     isShuffled,
     addToRecentlyPlayed,
-    play,
+    emitStartedListening,
   ]);
 
   const previous = useCallback(() => {
@@ -535,14 +443,24 @@ const PlayerContextProvider = (props) => {
       setTrack(prevSong);
       addToRecentlyPlayed(prevSong);
 
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          play();
-        }
-      }, 100);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.src = prevSong.file || prevSong.url || prevSong.src || prevSong.audio || "";
+        audioRef.current.load();
+        const handleCanPlay = () => {
+          audioRef.current.removeEventListener("canplay", handleCanPlay);
+          audioRef.current.play()
+            .then(() => {
+              setPlayStatus(true);
+              emitStartedListening();
+            })
+            .catch((err) => console.error("previous() play error:", err));
+        };
+        audioRef.current.addEventListener("canplay", handleCanPlay);
+      }
     }
-  }, [currentPlaylist, currentPlaylistIndex, addToRecentlyPlayed, play]);
+  }, [currentPlaylist, currentPlaylistIndex, addToRecentlyPlayed, emitStartedListening]);
 
   const seekSong = useCallback((e) => {
     if (

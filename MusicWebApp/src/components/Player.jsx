@@ -3,14 +3,10 @@ import React, { useState, useRef, useEffect } from "react";
 import { Play, Pause, Flame, Heart } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
-import { useAuth } from "../context/AuthContext";
 
 const Player = () => {
-  const { user } = useAuth();
   const {
     track,
-    audioRef,
-    socketRef,
     seekBg,
     seekBar,
     playStatus,
@@ -37,40 +33,6 @@ const Player = () => {
   const volumeRef = useRef(null);
 
   const isLiked = track ? isSongLiked(track._id) : false;
-
-  // Attach audio playback events for realtime listener socket emits
-  useEffect(() => {
-    const el = audioRef?.current;
-    if (!el) return;
-    const onPlay = () => {
-      const uid = user?._id ?? user?.id;
-      if (uid && socketRef?.current) {
-        const userId = typeof uid === "string" ? uid : String(uid);
-        socketRef.current.emit("user_started_listening", userId);
-        console.log("Started listening:", userId);
-      }
-    };
-    const onPause = () => {
-      const uid = user?._id ?? user?.id;
-      if (uid && socketRef?.current) {
-        socketRef.current.emit("user_stopped_listening", typeof uid === "string" ? uid : String(uid));
-      }
-    };
-    const onEnded = () => {
-      const uid = user?._id ?? user?.id;
-      if (uid && socketRef?.current) {
-        socketRef.current.emit("user_stopped_listening", typeof uid === "string" ? uid : String(uid));
-      }
-    };
-    el.addEventListener("play", onPlay);
-    el.addEventListener("pause", onPause);
-    el.addEventListener("ended", onEnded);
-    return () => {
-      el.removeEventListener("play", onPlay);
-      el.removeEventListener("pause", onPause);
-      el.removeEventListener("ended", onEnded);
-    };
-  }, [audioRef, socketRef, user]);
 
   // Close volume popup when clicking outside
   useEffect(() => {
