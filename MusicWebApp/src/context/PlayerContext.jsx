@@ -225,22 +225,22 @@ const PlayerContextProvider = (props) => {
         .play()
         .then(() => {
           setPlayStatus(true);
-          emitStartedListening();
+          // Socket emit is handled exclusively by el.onplay (audio element callback)
         })
         .catch((error) => {
           console.error("Play error:", error);
           showToast("Failed to play song", "error");
         });
     }
-  }, [track, volume, showToast, emitStartedListening]);
+  }, [track, volume, showToast]);
 
   const pause = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       setPlayStatus(false);
-      emitStoppedListening();
+      // Socket emit is handled exclusively by el.onpause (audio element callback)
     }
-  }, [emitStoppedListening]);
+  }, []);
 
   const togglePlay = useCallback(() => {
     if (playStatus) {
@@ -298,7 +298,7 @@ const PlayerContextProvider = (props) => {
               .then(() => {
                 setPlayStatus(true);
                 showToast(`Now playing: ${song.name}`, "success");
-                emitStartedListening();
+                // Socket emit is handled exclusively by el.onplay (audio element callback)
 
                 // Track a "play" only once per track start (even if events fire multiple times)
                 try {
@@ -359,7 +359,6 @@ const PlayerContextProvider = (props) => {
       getSafeSongsData,
       addToRecentlyPlayed,
       showToast,
-      emitStartedListening,
     ],
   );
 
@@ -408,16 +407,15 @@ const PlayerContextProvider = (props) => {
         audioRef.current.currentTime = 0;
         audioRef.current.src = nextSong.file || nextSong.url || nextSong.src || nextSong.audio || "";
         audioRef.current.load();
-        const handleCanPlay = () => {
-          audioRef.current.removeEventListener("canplay", handleCanPlay);
+        // { once: true } prevents handler accumulation from rapid next() calls
+        audioRef.current.addEventListener("canplay", () => {
           audioRef.current.play()
             .then(() => {
               setPlayStatus(true);
-              emitStartedListening();
+              // Socket emit handled exclusively by el.onplay
             })
             .catch((err) => console.error("next() play error:", err));
-        };
-        audioRef.current.addEventListener("canplay", handleCanPlay);
+        }, { once: true });
       }
     }
   }, [
@@ -425,7 +423,6 @@ const PlayerContextProvider = (props) => {
     currentPlaylistIndex,
     isShuffled,
     addToRecentlyPlayed,
-    emitStartedListening,
   ]);
 
   const previous = useCallback(() => {
@@ -448,19 +445,18 @@ const PlayerContextProvider = (props) => {
         audioRef.current.currentTime = 0;
         audioRef.current.src = prevSong.file || prevSong.url || prevSong.src || prevSong.audio || "";
         audioRef.current.load();
-        const handleCanPlay = () => {
-          audioRef.current.removeEventListener("canplay", handleCanPlay);
+        // { once: true } prevents handler accumulation from rapid previous() calls
+        audioRef.current.addEventListener("canplay", () => {
           audioRef.current.play()
             .then(() => {
               setPlayStatus(true);
-              emitStartedListening();
+              // Socket emit handled exclusively by el.onplay
             })
             .catch((err) => console.error("previous() play error:", err));
-        };
-        audioRef.current.addEventListener("canplay", handleCanPlay);
+        }, { once: true });
       }
     }
-  }, [currentPlaylist, currentPlaylistIndex, addToRecentlyPlayed, emitStartedListening]);
+  }, [currentPlaylist, currentPlaylistIndex, addToRecentlyPlayed]);
 
   const seekSong = useCallback((e) => {
     if (
