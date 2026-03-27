@@ -250,7 +250,7 @@ const PlayerContextProvider = (props) => {
       try {
         setTrack(song);
         addToRecentlyPlayed(song);
-        const safePlaylist = Array.isArray(playlist) ? playlist : safeSongs;
+        const safePlaylist = Array.isArray(playlist) ? playlist : songsData;
         setCurrentPlaylist(safePlaylist);
         const songIndex = safePlaylist.findIndex((item) => item?._id === id);
         setCurrentPlaylistIndex(songIndex >= 0 ? songIndex : 0);
