@@ -1,5 +1,5 @@
 // pages/AdminAnalytics.jsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { url } from "../App";
 import { toast } from "react-toastify";
@@ -28,6 +28,8 @@ const AdminAnalytics = () => {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activityLoading, setActivityLoading] = useState(true);
+  const [liveListeners, setLiveListeners] = useState(0);
+  const socketRef = useRef(null);
 
   const authHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
@@ -56,16 +58,15 @@ const AdminAnalytics = () => {
 
   const fetchActivity = useCallback(async () => {
     try {
-      setActivityLoading(true);
       const response = await axios.get(`${url}/api/admin/recent-activity`, {
         headers: authHeaders(),
       });
       if (response.data.success) {
         setActivity(response.data.data);
+        setActivityLoading(false);
       }
     } catch (error) {
       console.error("Error fetching activity:", error);
-    } finally {
       setActivityLoading(false);
     }
   }, []);
@@ -73,7 +74,39 @@ const AdminAnalytics = () => {
   useEffect(() => {
     fetchAnalytics();
     fetchActivity();
+
+    // Auto-refresh activity every 10 seconds to pick up song plays and other events
+    const activityInterval = setInterval(fetchActivity, 10000);
+
+    return () => clearInterval(activityInterval);
   }, [fetchAnalytics, fetchActivity]);
+
+  // Real-time socket connection for live listener count
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { io } = await import("socket.io-client");
+        const socket = io({ path: "/socket.io", transports: ["polling", "websocket"] });
+        if (!mounted) { socket.disconnect(); return; }
+        socketRef.current = socket;
+
+        socket.on("users_listening", (count) => {
+          if (!mounted) return;
+          setLiveListeners(typeof count === "number" ? Math.max(0, count) : 0);
+        });
+      } catch (err) {
+        console.warn("[Admin] Socket not available:", err.message);
+      }
+    })();
+    return () => {
+      mounted = false;
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, []);
 
   const handleRefresh = () => {
     fetchAnalytics();
@@ -137,11 +170,15 @@ const AdminAnalytics = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Active Users</p>
-              <p className="text-3xl font-bold text-gray-900">{analytics.activeUsers?.toLocaleString() || 0}</p>
+              <p className="text-sm font-medium text-gray-600">Live Listeners</p>
+              <p className="text-3xl font-bold text-gray-900">{liveListeners.toLocaleString()}</p>
+              <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full inline-block animate-pulse"></span>
+                Real-time
+              </p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">👥</span>
+              <span className="text-2xl">🎧</span>
             </div>
           </div>
         </div>

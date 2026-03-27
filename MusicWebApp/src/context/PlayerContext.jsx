@@ -45,6 +45,11 @@ const PlayerContextProvider = (props) => {
   }, [user]);
   userRef.current = user;
 
+  // Track the src that playWithId already loaded so the [track] effect doesn't double-load
+  const manuallyLoadedSrcRef = useRef(null);
+  // Suppress emitStoppedListening while switching songs (avoid 0-listener flash)
+  const isTransitioningRef = useRef(false);
+
   const url = import.meta.env.VITE_API_URL ?? "";
 
   // Core data states
@@ -182,6 +187,9 @@ const PlayerContextProvider = (props) => {
   }, []);
 
   const emitStoppedListening = useCallback(() => {
+    // Don't emit during song transitions — the brief pause between songs is internal
+    if (isTransitioningRef.current) return;
+
     const sock = socketRef.current;
     const listenerId = listenerIdRef.current;
 
@@ -264,6 +272,11 @@ const PlayerContextProvider = (props) => {
         setCurrentPlaylistIndex(songIndex >= 0 ? songIndex : 0);
 
         if (audioRef.current) {
+          // Mark transition so emitStoppedListening is suppressed during load
+          isTransitioningRef.current = true;
+          // Tell [track] effect this src is already being loaded — skip double-load
+          manuallyLoadedSrcRef.current = song.file;
+
           // Stop current playback
           audioRef.current.pause();
           audioRef.current.currentTime = 0;
@@ -278,6 +291,7 @@ const PlayerContextProvider = (props) => {
             audioRef.current
               .play()
               .then(() => {
+                isTransitioningRef.current = false;
                 setPlayStatus(true);
                 showToast(`Now playing: ${song.name}`, "success");
                 // Socket emit is handled exclusively by el.onplay (audio element callback)
@@ -304,6 +318,7 @@ const PlayerContextProvider = (props) => {
                 }
               })
               .catch((error) => {
+                isTransitioningRef.current = false;
                 console.error("Play error:", error);
                 showToast("Failed to play song. Please try again.", "error");
                 setPlayStatus(false);
@@ -311,6 +326,7 @@ const PlayerContextProvider = (props) => {
           };
 
           const handleError = () => {
+            isTransitioningRef.current = false;
             audioRef.current.removeEventListener("error", handleError);
             console.error("Audio load error for:", song.file);
             showToast("Failed to load song. Please try another song.", "error");
@@ -1274,12 +1290,20 @@ const PlayerContextProvider = (props) => {
     if (track) {
       const src = track.file || track.url || track.src || track.audio;
       if (src) {
+        // If playWithId already loaded this exact src, skip the double-load to prevent
+        // interrupting ongoing playback and firing a spurious onpause/emitStoppedListening.
+        if (manuallyLoadedSrcRef.current === src) {
+          manuallyLoadedSrcRef.current = null;
+          audioElement.volume = volume / 100;
+          return;
+        }
         audioElement.src = src;
         audioElement.load();
         audioElement.volume = volume / 100;
         setPlayStatus(false);
       }
     } else {
+      manuallyLoadedSrcRef.current = null;
       audioElement.removeAttribute("src");
       audioElement.load();
       setPlayStatus(false);
