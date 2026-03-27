@@ -1400,6 +1400,7 @@ const PlayerContextProvider = (props) => {
       recommendations,
       trendingSongs,
       liveListening,
+      activeListenersCount,
       searchQuery,
       searchResults,
       showPlaylistModal,
