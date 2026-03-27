@@ -404,18 +404,23 @@ const PlayerContextProvider = (props) => {
       addToRecentlyPlayed(nextSong);
 
       if (audioRef.current) {
+        isTransitioningRef.current = true;
+        manuallyLoadedSrcRef.current = nextSong.file || nextSong.url || nextSong.src || nextSong.audio || "";
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
-        audioRef.current.src = nextSong.file || nextSong.url || nextSong.src || nextSong.audio || "";
+        audioRef.current.src = manuallyLoadedSrcRef.current;
         audioRef.current.load();
         // { once: true } prevents handler accumulation from rapid next() calls
         audioRef.current.addEventListener("canplay", () => {
           audioRef.current.play()
             .then(() => {
               setPlayStatus(true);
-              // Socket emit handled exclusively by el.onplay
+              // Socket emit + transition flag cleared exclusively by el.onplay
             })
-            .catch((err) => console.error("next() play error:", err));
+            .catch((err) => {
+              isTransitioningRef.current = false;
+              console.error("next() play error:", err);
+            });
         }, { once: true });
       }
     }
@@ -442,18 +447,23 @@ const PlayerContextProvider = (props) => {
       addToRecentlyPlayed(prevSong);
 
       if (audioRef.current) {
+        isTransitioningRef.current = true;
+        manuallyLoadedSrcRef.current = prevSong.file || prevSong.url || prevSong.src || prevSong.audio || "";
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
-        audioRef.current.src = prevSong.file || prevSong.url || prevSong.src || prevSong.audio || "";
+        audioRef.current.src = manuallyLoadedSrcRef.current;
         audioRef.current.load();
         // { once: true } prevents handler accumulation from rapid previous() calls
         audioRef.current.addEventListener("canplay", () => {
           audioRef.current.play()
             .then(() => {
               setPlayStatus(true);
-              // Socket emit handled exclusively by el.onplay
+              // Socket emit + transition flag cleared exclusively by el.onplay
             })
-            .catch((err) => console.error("previous() play error:", err));
+            .catch((err) => {
+              isTransitioningRef.current = false;
+              console.error("previous() play error:", err);
+            });
         }, { once: true });
       }
     }
@@ -1422,6 +1432,10 @@ const PlayerContextProvider = (props) => {
           audioRef.current = el;
           if (!el) return;
           el.onplay = () => {
+            // Clear transition flag the moment audio actually starts playing.
+            // This MUST happen here (not in play().then()) because el.onpause
+            // can fire in the microtask gap between play() resolving and .then() running.
+            isTransitioningRef.current = false;
             emitStartedListening();
           };
 
