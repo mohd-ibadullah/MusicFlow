@@ -1,6 +1,6 @@
 // components/DisplayPlaylist.jsx
 import React, { useState, useEffect } from "react";
-import { Play, Music2 } from "lucide-react";
+import { Play, Pause, Music2 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { usePlayer } from "../context/PlayerContext";
@@ -9,12 +9,14 @@ import { useToast } from "../context/ThemeContext";
 const DisplayPlaylist = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { 
-    playWithId, 
+  const {
+    playWithId,
     playPlaylist,
-    deletePlaylist, 
+    deletePlaylist,
     removeSongFromPlaylist,
-    playlists
+    playlists,
+    track,
+    playStatus,
   } = usePlayer();
   
   const { showToast } = useToast();
@@ -175,22 +177,37 @@ const DisplayPlaylist = () => {
               <div className="col-span-1 text-center">Actions</div>
             </div>
             
-            {playlist.songs.map((song, index) => (
+            {playlist.songs.map((song, index) => {
+              const isCurrent = track?._id === song._id;
+              const isPlaying = isCurrent && playStatus;
+              return (
               <div
                 key={song._id}
-                className="grid grid-cols-12 gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all group items-center"
+                className={`grid grid-cols-12 gap-4 p-3 rounded-lg transition-all group items-center ${
+                  isCurrent
+                    ? "bg-blue-50 dark:bg-blue-900/20"
+                    : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
               >
                 <div className="col-span-1 text-center text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300">
-                  {index + 1}
+                  {isCurrent ? (
+                    isPlaying ? (
+                      <Pause className="w-4 h-4 text-blue-500 mx-auto" />
+                    ) : (
+                      <Play className="w-4 h-4 text-blue-500 mx-auto" />
+                    )
+                  ) : (
+                    index + 1
+                  )}
                 </div>
                 <div className="col-span-5 flex items-center gap-3">
-                  <img 
-                    src={song.image} 
+                  <img
+                    src={song.image}
                     alt={song.name}
                     className="w-12 h-12 rounded object-cover"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-gray-900 dark:text-gray-100 font-medium truncate">{song.name}</p>
+                    <p className={`font-medium truncate ${isCurrent ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"}`}>{song.name}</p>
                     <p className="text-gray-500 dark:text-gray-400 text-sm truncate">{song.desc}</p>
                   </div>
                 </div>
@@ -202,14 +219,15 @@ const DisplayPlaylist = () => {
                 </div>
                 <div className="col-span-1 flex justify-center gap-2">
                   <button
-                    onClick={() => {
-                      playWithId(song._id, playlist.songs);
-                      showToast(`Playing: ${song.name}`, "success");
-                    }}
+                    onClick={() => playWithId(song._id, playlist.songs)}
                     className="btn-primary opacity-0 group-hover:opacity-100 p-2 min-w-0"
-                    title="Play song"
+                    title={isPlaying ? "Pause" : "Play"}
                   >
-                    <Play className="w-4 h-4 text-white shrink-0" size={16} strokeWidth={2.5} />
+                    {isPlaying ? (
+                      <Pause className="w-4 h-4 text-white shrink-0" size={16} strokeWidth={2.5} />
+                    ) : (
+                      <Play className="w-4 h-4 text-white shrink-0" size={16} strokeWidth={2.5} />
+                    )}
                   </button>
                   <button
                     onClick={() => setShowRemoveSong(song._id)}
@@ -222,7 +240,8 @@ const DisplayPlaylist = () => {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

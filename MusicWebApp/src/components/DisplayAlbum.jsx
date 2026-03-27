@@ -1,6 +1,6 @@
 // components/DisplayAlbum.jsx
 import React, { useEffect, useState, useContext } from "react";
-import { Disc, Music2 } from "lucide-react";
+import { Disc, Music2, Play, Pause } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PlayerContext } from "../context/PlayerContext";
 import { useToast } from "../context/ThemeContext";
@@ -10,7 +10,7 @@ const DisplayAlbum = ({ album }) => {
   const navigate = useNavigate();
   const [albumData, setAlbumData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { playWithId, albumsData, songsData } = useContext(PlayerContext);
+  const { playWithId, albumsData, songsData, track, playStatus } = useContext(PlayerContext);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -91,11 +91,12 @@ const DisplayAlbum = ({ album }) => {
     }
   };
 
-  const handlePlaySong = (songId, index) => {
-    if (songId && albumSongs.length > 0) {
-      playWithId(songId, albumSongs);
-      showToast("Playing song", "success");
-    }
+  const isCurrentSong = (songId) => track?._id === songId;
+  const isActivePlaying = (songId) => track?._id === songId && playStatus;
+
+  const handlePlaySong = (songId) => {
+    if (!songId || albumSongs.length === 0) return;
+    playWithId(songId, albumSongs);
   };
 
   return (
@@ -157,38 +158,57 @@ const DisplayAlbum = ({ album }) => {
           </div>
           
           {/* Songs */}
-          {albumSongs.map((item, index) => (
-            <div
-              key={item._id || index}
-              onClick={() => handlePlaySong(item._id, index)}
-              className="grid grid-cols-12 gap-4 p-6 items-center text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-200 group"
-            >
-              <div className="col-span-1 text-center text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">
-                {index + 1}
-              </div>
-              <div className="col-span-6 flex items-center space-x-4">
-                <img 
-                  src={item.image || safeAlbumData.image} 
-                  className="w-12 h-12 rounded object-cover" 
-                  alt={item.name} 
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-gray-900 dark:text-gray-100 font-medium truncate">
-                    {item.name || "Unknown Song"}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                    {item.desc || "No description"}
-                  </p>
+          {albumSongs.map((item, index) => {
+            const isCurrent = isCurrentSong(item._id);
+            const isPlaying = isActivePlaying(item._id);
+            return (
+              <div
+                key={item._id || index}
+                onClick={() => handlePlaySong(item._id)}
+                className={`grid grid-cols-12 gap-4 p-6 items-center cursor-pointer transition-colors duration-200 group ${
+                  isCurrent
+                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                <div className="col-span-1 flex items-center justify-center">
+                  {isCurrent ? (
+                    isPlaying ? (
+                      <Pause className="w-4 h-4 text-blue-500" />
+                    ) : (
+                      <Play className="w-4 h-4 text-blue-500" />
+                    )
+                  ) : (
+                    <span className="text-gray-400 group-hover:hidden">{index + 1}</span>
+                  )}
+                  {!isCurrent && (
+                    <Play className="w-4 h-4 text-gray-500 hidden group-hover:block" />
+                  )}
+                </div>
+                <div className="col-span-6 flex items-center space-x-4">
+                  <img
+                    src={item.image || safeAlbumData.image}
+                    className="w-12 h-12 rounded object-cover"
+                    alt={item.name}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className={`font-medium truncate ${isCurrent ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"}`}>
+                      {item.name || "Unknown Song"}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                      {item.desc || "No description"}
+                    </p>
+                  </div>
+                </div>
+                <div className="col-span-3 hidden md:block text-gray-500 dark:text-gray-400 truncate">
+                  {safeAlbumData.name}
+                </div>
+                <div className="col-span-2 text-center text-sm text-gray-500 dark:text-gray-400">
+                  {item.duration || "0:00"}
                 </div>
               </div>
-              <div className="col-span-3 hidden md:block text-gray-500 dark:text-gray-400 truncate">
-                {safeAlbumData.name}
-              </div>
-              <div className="col-span-2 text-center text-sm text-gray-500 dark:text-gray-400">
-                {item.duration || "0:00"}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
