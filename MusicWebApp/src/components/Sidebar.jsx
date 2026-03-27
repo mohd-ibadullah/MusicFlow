@@ -3,14 +3,12 @@ import React, { useState } from "react";
 import { Home, Search, Headphones, Library, Clock, Heart, Music2, Disc } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { usePlayer } from "../context/PlayerContext"; // Import usePlayer hook
-import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setShowPlaylistModal, likedSongs, songsData, albumsData, playlists, recentlyPlayed } = usePlayer(); // Use usePlayer hook
-  const { isDark } = useTheme();
+  const { setShowPlaylistModal, likedSongs, albumsData, playlists, recentlyPlayed } = usePlayer();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const mainMenu = [

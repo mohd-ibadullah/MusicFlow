@@ -3,14 +3,12 @@ import React, { useState } from "react";
 import { Home, Search, Headphones, Library, Clock, Heart, Music2, Disc } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { usePlayer } from "../context/PlayerContext";
-import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 
 const MobileSidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setShowPlaylistModal, likedSongs, songsData, albumsData, playlists, recentlyPlayed } = usePlayer();
-  const { isDark } = useTheme();
+  const { setShowPlaylistModal, likedSongs, albumsData, playlists, recentlyPlayed } = usePlayer();
   const { user, isAuthenticated, logout } = useAuth();
 
   const mainMenu = [

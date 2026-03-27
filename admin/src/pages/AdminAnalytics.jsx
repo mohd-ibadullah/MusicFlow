@@ -150,8 +150,8 @@ const AdminAnalytics = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-600">{song.plays?.toLocaleString() || 0} plays</p>
-                  <p className="text-sm text-gray-600">{song.likes?.toLocaleString() || 0} likes</p>
+                  <p className="text-sm text-gray-600">{song.playCount?.toLocaleString() || 0} plays</p>
+                  <p className="text-sm text-gray-600">{song.likeCount?.toLocaleString() || 0} likes</p>
                 </div>
               </div>
             ))}

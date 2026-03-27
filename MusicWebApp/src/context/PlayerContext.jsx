@@ -11,8 +11,6 @@ import React, {
 import axios from "axios";
 import { useToast } from "./ThemeContext";
 import { useAuth } from "./AuthContext";
-// Import sample data for fallback
-import { sampleSongs, sampleAlbums } from "../data/sampleData";
 
 export const PlayerContext = createContext();
 
@@ -572,12 +570,8 @@ const PlayerContextProvider = (props) => {
       };
 
       const needle = normalize(q);
-      const safeSongs = songsData;
-      const safeAlbums = albumsData;
-      const safePlaylists = playlists;
-
       // Match songs by common string fields (be generous to backend shape)
-      const matchedSongs = safeSongs.filter((song) => {
+      const matchedSongs = songsData.filter((song) => {
         const hayParts = [
           song?.name,
           song?.title,
@@ -591,7 +585,7 @@ const PlayerContextProvider = (props) => {
         return hay.includes(needle);
       });
 
-      const matchedAlbums = safeAlbums.filter((album) => {
+      const matchedAlbums = albumsData.filter((album) => {
         const hayParts = [
           album?.name,
           album?.title,
@@ -602,7 +596,7 @@ const PlayerContextProvider = (props) => {
         return hay.includes(needle);
       });
 
-      const matchedPlaylists = safePlaylists.filter((playlist) => {
+      const matchedPlaylists = playlists.filter((playlist) => {
         const hayParts = [
           playlist?.name,
           playlist?.title,
