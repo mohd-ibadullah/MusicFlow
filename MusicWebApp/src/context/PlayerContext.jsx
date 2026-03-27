@@ -231,6 +231,16 @@ const PlayerContextProvider = (props) => {
         return;
       }
 
+      // If the same song is already loaded, just toggle play/pause
+      if (track && track._id === id) {
+        if (playStatusRef.current) {
+          pause();
+        } else {
+          play();
+        }
+        return;
+      }
+
       let song = songsData.find((item) => item?._id === id);
       if (!song && Array.isArray(playlist) && playlist.length > 0) {
         song = playlist.find((item) => item?._id === id);
@@ -328,9 +338,12 @@ const PlayerContextProvider = (props) => {
       }
     },
     [
+      track,
       songsData,
       addToRecentlyPlayed,
       showToast,
+      play,
+      pause,
     ],
   );
 
