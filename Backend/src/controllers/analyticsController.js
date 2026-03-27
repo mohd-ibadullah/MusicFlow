@@ -27,9 +27,6 @@ export const getAnalytics = async (req, res) => {
       topSongs,
     };
 
-    const dbName = Song.db?.databaseName || "unknown";
-    console.log("[Analytics] db:", dbName, "totalSongs:", totalSongs, "totalStreams:", totalStreams, "activeListeners:", activeListeners, "topSongs:", topSongs.length);
-
     res.status(200).json({
       success: true,
       data,

@@ -48,24 +48,6 @@ connectRedis().catch((err) => console.warn("Redis init:", err.message));
 app.use(express.json());
 app.use(cors());
 
-// Test routes
-app.get("/api/test", (req, res) => {
-  res.json({
-    success: true,
-    message: "Backend is working!",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.post("/api/test-upload", (req, res) => {
-  console.log("Test upload received:", req.body);
-  res.json({
-    success: true,
-    message: "Upload endpoint is reachable",
-    received: req.body,
-  });
-});
-
 // Health check endpoint
 app.get("/api/health", async (req, res) => {
   try {
@@ -164,29 +146,19 @@ app.set("io", io);
 const activeSockets = new Set();
 
 io.on("connection", (socket) => {
-  console.log("🔌 Socket connected:", socket.id);
-
   socket.on("user_started_listening", () => {
     activeSockets.add(socket.id);
-
-    const count = activeSockets.size;
-    io.emit("users_listening", count);
-
-    console.log("▶️ Users listening:", count);
+    io.emit("users_listening", activeSockets.size);
   });
 
   socket.on("user_stopped_listening", () => {
     activeSockets.delete(socket.id);
-
     io.emit("users_listening", activeSockets.size);
   });
 
   socket.on("disconnect", () => {
     activeSockets.delete(socket.id);
-
     io.emit("users_listening", activeSockets.size);
-
-    console.log("🔌 Socket disconnected:", socket.id);
   });
 });
 

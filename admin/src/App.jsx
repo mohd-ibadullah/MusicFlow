@@ -10,7 +10,6 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import SideBar from "./components/SideBar";
 import Navbar from "./components/Navbar";
-import TestUpload from "./components/TestUpload";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 
 export const url = import.meta.env.VITE_API_URL ?? "";
@@ -37,7 +36,6 @@ const App = () => {
                       <Route path="/list-album" element={<ListAlbum />} />
                       <Route path="/list-song" element={<ListSong />} />
                       <Route path="/analytics" element={<AdminAnalytics />} />
-                      <Route path="/test-upload" element={<TestUpload />} />
                     </Routes>
                   </main>
                 </div>

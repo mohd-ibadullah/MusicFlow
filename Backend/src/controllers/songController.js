@@ -20,8 +20,6 @@ export const addSong = async (req, res) => {
     const imageFile = req.files["image"][0].path;
     const audioFile = req.files["audio"][0].path;
 
-    console.log("📥 Adding song:", { name, description, album });
-
     let imageUpload, audioUpload;
 
     try {
@@ -53,7 +51,6 @@ export const addSong = async (req, res) => {
         (fileSizeInMB - Math.floor(fileSizeInMB)) * 60,
       );
       duration = `${estimatedMinutes}:${estimatedSeconds.toString().padStart(2, "0")}`;
-      console.log("🎵 Estimated duration:", duration);
     } catch (durationError) {
       console.warn("⚠️ Could not estimate duration:", durationError.message);
     }
@@ -82,12 +79,6 @@ export const addSong = async (req, res) => {
     } catch (cleanupError) {
       console.warn("⚠️ Could not clean up temp files:", cleanupError.message);
     }
-
-    console.log("✅ Song added successfully:", {
-      id: song._id,
-      name: song.name,
-      duration: song.duration,
-    });
 
     return res.status(200).json({
       success: true,
