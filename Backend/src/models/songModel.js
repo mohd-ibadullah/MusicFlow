@@ -14,6 +14,7 @@ const songSchema = new mongoose.Schema(
     image: { type: String, required: true },
     file: { type: String, required: true },
     duration: { type: String, required: true, default: "0:00" },
+    genre: { type: String, default: "" },
     playCount: { type: Number, default: 0, index: true },
     likeCount: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },

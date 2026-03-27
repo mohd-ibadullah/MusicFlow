@@ -15,7 +15,10 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET environment variable is not set");
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Check if user still exists and is active
     const user = await User.findById(decoded.userId);
@@ -97,7 +100,10 @@ const optionalAuth = async (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET environment variable is not set");
+      }
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findById(decoded.userId);
 
       if (user && user.isActive) {

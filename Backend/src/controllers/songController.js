@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Song from "../models/songModel.js";
+import User from "../models/userModel.js";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
 import { cacheGet, cacheSet, cacheDel, CACHE_KEYS } from "../utils/cache.js";
@@ -242,9 +243,6 @@ export const likeSong = async (req, res) => {
       });
     }
 
-    // Import User model
-    const User = (await import("../models/userModel.js")).default;
-
     // Check if song exists
     const song = await Song.findById(songId);
     if (!song) {
@@ -302,9 +300,6 @@ export const unlikeSong = async (req, res) => {
       });
     }
 
-    // Import User model
-    const User = (await import("../models/userModel.js")).default;
-
     // Remove song from user's liked songs
     const user = await User.findById(userId);
     if (!user) {
@@ -316,8 +311,9 @@ export const unlikeSong = async (req, res) => {
 
     user.likedSongs = user.likedSongs.filter((id) => id.toString() !== songId);
     await user.save();
-    // Decrement song likeCount (ensure non-negative via aggregation when needed)
-    await Song.findByIdAndUpdate(songId, { $inc: { likeCount: -1 } });
+    await Song.findByIdAndUpdate(songId, [
+      { $set: { likeCount: { $max: [{ $subtract: ["$likeCount", 1] }, 0] } } },
+    ]);
 
     res.status(200).json({
       success: true,
@@ -351,9 +347,6 @@ export const addToRecentlyPlayed = async (req, res) => {
       });
     }
 
-    // Import User model
-    const User = (await import("../models/userModel.js")).default;
-
     // Check if song exists
     const song = await Song.findById(songId);
     if (!song) {
@@ -362,9 +355,6 @@ export const addToRecentlyPlayed = async (req, res) => {
         message: "Song not found",
       });
     }
-
-    // Increment playCount on the song (listening activity tracking)
-    await Song.findByIdAndUpdate(songId, { $inc: { playCount: 1 } });
 
     // Get user and update recently played
     const user = await User.findById(userId);
@@ -430,9 +420,6 @@ export const getLikedSongs = async (req, res) => {
       });
     }
 
-    // Import User model
-    const User = (await import("../models/userModel.js")).default;
-
     // Get user with populated liked songs
     const user = await User.findById(userId).populate("likedSongs");
     if (!user) {
@@ -465,9 +452,6 @@ export const getRecentlyPlayed = async (req, res) => {
         message: "User not authenticated",
       });
     }
-
-    // Import User model
-    const User = (await import("../models/userModel.js")).default;
 
     // Get user with populated recently played songs
     const user = await User.findById(userId).populate("recentlyPlayed.song");
