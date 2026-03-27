@@ -1132,8 +1132,7 @@ const PlayerContextProvider = (props) => {
     (async () => {
       try {
         const { io } = await import("socket.io-client");
-        const baseUrl = (url || window.location.origin).replace(/\/$/, "");
-        const socket = io(baseUrl, { transports: ["websocket", "polling"] });
+        const socket = io({ path: "/socket.io", transports: ["polling", "websocket"] });
         if (!mounted) {
           socket.disconnect();
           return;

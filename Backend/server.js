@@ -144,6 +144,7 @@ const io = new Server(server, {
 app.set("io", io);
 
 const activeSockets = new Set();
+app.set("activeSockets", activeSockets);
 
 io.on("connection", (socket) => {
   socket.on("user_started_listening", () => {
@@ -162,40 +163,16 @@ io.on("connection", (socket) => {
   });
 });
 
-// Function to find an available port
-const findAvailablePort = (startPort) => {
-  return new Promise((resolve, reject) => {
-    const server = http.createServer();
-    server.listen(startPort, () => {
-      const port = server.address().port;
-      server.close(() => resolve(port));
-    });
-    server.on("error", (err) => {
-      if (err.code === "EADDRINUSE") {
-        // Try next port
-        findAvailablePort(startPort + 1)
-          .then(resolve)
-          .catch(reject);
-      } else {
-        reject(err);
-      }
-    });
-  });
-};
+// Start server on the configured port — fail fast if port is already in use
+server.listen(port, () => {
+  console.log(`✅ Server listening on localhost:${port}`);
+});
 
-// Start server with automatic port selection
-findAvailablePort(port)
-  .then((availablePort) => {
-    server.listen(availablePort, () => {
-      console.log(`✅ Server listening on localhost:${availablePort}`);
-      if (availablePort !== port) {
-        console.log(
-          `ℹ️ Port ${port} was in use, using ${availablePort} instead`,
-        );
-      }
-    });
-  })
-  .catch((err) => {
-    console.error("❌ Failed to find available port:", err);
-    process.exit(1);
-  });
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`❌ Port ${port} is already in use. Set a different PORT env var or free the port.`);
+  } else {
+    console.error("❌ Server error:", err);
+  }
+  process.exit(1);
+});
