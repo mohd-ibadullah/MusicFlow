@@ -5,6 +5,7 @@ import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
 import { cacheGet, cacheSet, cacheDel, CACHE_KEYS } from "../utils/cache.js";
 import * as songService from "../services/songService.js";
+import logActivity from "../utils/logActivity.js";
 
 export const addSong = async (req, res) => {
   try {
@@ -71,6 +72,10 @@ export const addSong = async (req, res) => {
     await song.save();
     await cacheDel(CACHE_KEYS.SONGS_LIST);
     await cacheDel(CACHE_KEYS.TRENDING);
+    logActivity({
+      type: "song_added",
+      message: `"${song.name}" by ${song.artist || "Unknown"} was added`,
+    });
 
     // Clean up temporary files
     try {
@@ -255,8 +260,12 @@ export const likeSong = async (req, res) => {
     if (!user.likedSongs.includes(songId)) {
       user.likedSongs.push(songId);
       await user.save();
-      // Keep song likeCount in sync
       await Song.findByIdAndUpdate(songId, { $inc: { likeCount: 1 } });
+      logActivity({
+        type: "song_liked",
+        message: `"${song.name}" was liked`,
+        userId: userId,
+      });
     }
 
     res.status(200).json({
@@ -366,16 +375,19 @@ export const addToRecentlyPlayed = async (req, res) => {
       (item) => item.song && item.song.toString() !== songId,
     );
 
-    // Add song to beginning of recently played
     user.recentlyPlayed.unshift({
       song: songId,
       playedAt: new Date(),
     });
 
-    // Keep only last 5 songs
     user.recentlyPlayed = user.recentlyPlayed.slice(0, 5);
 
     await user.save();
+    logActivity({
+      type: "song_played",
+      message: `"${song.name}" by ${song.artist || "Unknown"} was played`,
+      userId: userId,
+    });
 
     // Real-time: broadcast that this user is listening (for live activity UI)
     try {

@@ -2,6 +2,7 @@ import { v2 as cloudinary } from "cloudinary";
 import Album from "../models/albumModel.js";
 import fs from "fs";
 import { cacheGet, cacheSet, cacheDel } from "../utils/cache.js";
+import logActivity from "../utils/logActivity.js";
 
 const CACHE_ALBUMS_KEY = "albums:list";
 
@@ -49,17 +50,18 @@ const addAlbum = async (req, res) => {
       const album = new Album({ name, desc, bgColor, image: imageUpload.secure_url });
       await album.save();
       await cacheDel(CACHE_ALBUMS_KEY);
-      
+      logActivity({ type: "album_added", message: `Album "${album.name}" was added` });
+
       try {
         fs.unlinkSync(imageFile);
       } catch (cleanupError) {
         console.warn("⚠️ Could not clean up temp file:", cleanupError.message);
       }
-      
-      res.status(200).json({ 
+
+      res.status(200).json({
         success: true,
-        message: "Album added successfully", 
-        album 
+        message: "Album added successfully",
+        album,
       });
     } catch (cloudinaryError) {
       console.error("❌ Cloudinary error:", cloudinaryError);

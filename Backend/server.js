@@ -34,6 +34,7 @@ import "./src/models/songModel.js";
 import "./src/models/albumModel.js";
 import "./src/models/playlistModel.js";
 import "./src/models/userModel.js";
+import "./src/models/activityModel.js";
 
 // App config
 const app = express();

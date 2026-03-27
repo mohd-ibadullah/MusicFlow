@@ -1,5 +1,6 @@
 import Playlist from "../models/playlistModel.js";
 import Song from "../models/songModel.js";
+import logActivity from "../utils/logActivity.js";
 
 export const createPlaylist = async (req, res) => {
   try {
@@ -16,10 +17,15 @@ export const createPlaylist = async (req, res) => {
     const playlist = new Playlist({
       name,
       description: description || "My playlist",
-      user: userId
+      user: userId,
     });
     await playlist.save();
-    
+    logActivity({
+      type: "playlist_created",
+      message: `Playlist "${playlist.name}" was created`,
+      userId: userId,
+    });
+
     res.status(201).json({ success: true, playlist });
   } catch (error) {
     console.error("Error creating playlist:", error);

@@ -1,23 +1,44 @@
 // pages/AdminAnalytics.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { url } from "../App";
 import { toast } from "react-toastify";
 
+const TYPE_META = {
+  song_played:      { icon: "🎵", label: "Played" },
+  song_added:       { icon: "➕", label: "Added" },
+  song_liked:       { icon: "❤️", label: "Liked" },
+  playlist_created: { icon: "🎶", label: "Playlist" },
+  album_added:      { icon: "💿", label: "Album" },
+};
+
+const timeAgo = (dateStr) => {
+  const seconds = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
+
 const AdminAnalytics = () => {
   const [analytics, setAnalytics] = useState(null);
+  const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activityLoading, setActivityLoading] = useState(true);
 
-  const fetchAnalytics = async () => {
+  const authHeaders = () => ({
+    Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+  });
+
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('auth_token');
       const response = await axios.get(`${url}/api/admin/analytics`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: authHeaders(),
       });
-
       if (response.data.success) {
         setAnalytics(response.data.data);
       } else {
@@ -31,11 +52,33 @@ const AdminAnalytics = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const fetchActivity = useCallback(async () => {
+    try {
+      setActivityLoading(true);
+      const response = await axios.get(`${url}/api/admin/recent-activity`, {
+        headers: authHeaders(),
+      });
+      if (response.data.success) {
+        setActivity(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching activity:", error);
+    } finally {
+      setActivityLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+    fetchActivity();
+  }, [fetchAnalytics, fetchActivity]);
+
+  const handleRefresh = () => {
+    fetchAnalytics();
+    fetchActivity();
+  };
 
   if (loading) {
     return (
@@ -70,7 +113,7 @@ const AdminAnalytics = () => {
           <p className="text-gray-600 mt-1">Platform performance and user engagement metrics</p>
         </div>
         <button
-          onClick={fetchAnalytics}
+          onClick={handleRefresh}
           className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 transition-colors"
         >
           🔄 Refresh
@@ -191,22 +234,27 @@ const AdminAnalytics = () => {
       {/* Recent Activity */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Activity</h2>
-        {analytics.recentActivity?.length > 0 ? (
+        {activityLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="w-8 h-8 border-4 border-gray-300 border-t-green-600 rounded-full animate-spin"></div>
+          </div>
+        ) : activity.length > 0 ? (
           <div className="space-y-3">
-            {analytics.recentActivity.map((activity, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <p className="text-sm text-gray-700">{activity.description}</p>
+            {activity.map((item) => {
+              const meta = TYPE_META[item.type] || { icon: "📌", label: "" };
+              return (
+                <div key={item._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-lg">{meta.icon}</span>
+                    <p className="text-sm text-gray-700">{item.message}</p>
+                  </div>
+                  <p className="text-xs text-gray-400 whitespace-nowrap ml-4">{timeAgo(item.createdAt)}</p>
                 </div>
-                <p className="text-xs text-gray-500">
-                  {new Date(activity.timestamp).toLocaleDateString()}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-8">No recent activity</p>
+          <p className="text-gray-500 text-center py-8">No activity yet — it will appear here as users interact with the platform</p>
         )}
       </div>
     </div>

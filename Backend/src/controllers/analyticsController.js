@@ -1,12 +1,13 @@
 import Song from "../models/songModel.js";
 import Album from "../models/albumModel.js";
+import Activity from "../models/activityModel.js";
 
 export const getAnalytics = async (req, res) => {
   try {
     const activeSockets = req.app.get("activeSockets");
     const activeUsers = activeSockets ? activeSockets.size : 0;
 
-    const [totalSongs, totalAlbums, streamAgg, topSongs, topArtistsAgg, recentSongs] = await Promise.all([
+    const [totalSongs, totalAlbums, streamAgg, topSongs, topArtistsAgg] = await Promise.all([
       Song.countDocuments(),
       Album.countDocuments(),
       Song.aggregate([
@@ -26,7 +27,6 @@ export const getAnalytics = async (req, res) => {
         { $limit: 10 },
         { $project: { _id: 1, name: "$_id", totalSongs: 1, totalPlays: 1 } },
       ]),
-      Song.find().sort({ createdAt: -1 }).limit(15).lean(),
     ]);
 
     const totalStreams = streamAgg.length ? streamAgg[0].total : 0;
@@ -38,11 +38,6 @@ export const getAnalytics = async (req, res) => {
       totalPlays: a.totalPlays,
     }));
 
-    const recentActivity = recentSongs.map((song) => ({
-      description: `"${song.name}" by ${song.artist || "Unknown"} was added${song.playCount ? ` — ${song.playCount} plays` : ""}`,
-      timestamp: song.createdAt,
-    }));
-
     res.status(200).json({
       success: true,
       data: {
@@ -52,7 +47,6 @@ export const getAnalytics = async (req, res) => {
         activeUsers,
         topSongs,
         topArtists,
-        recentActivity,
       },
     });
   } catch (error) {
@@ -60,6 +54,27 @@ export const getAnalytics = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching analytics",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+export const getRecentActivity = async (req, res) => {
+  try {
+    const activities = await Activity.find()
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: activities,
+    });
+  } catch (error) {
+    console.error("Recent activity error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching recent activity",
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
