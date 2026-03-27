@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "peu8K0uA-DEcxS09hzwD7"
+uri = "file://PROJECT_MASTER.md"
+type = "text"
+title = "PROJECT_MASTER.md — MusicFlow Interview Guide"
