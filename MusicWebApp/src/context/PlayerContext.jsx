@@ -1244,9 +1244,8 @@ const PlayerContextProvider = (props) => {
         if (safePlaylist.length > 0) {
           next();
         } else {
-          // If no playlist, just stop
+          // If no playlist, just stop — socket emit is handled by el.onended
           setPlayStatus(false);
-          emitStoppedListening();
         }
       }
     };
@@ -1310,7 +1309,7 @@ const PlayerContextProvider = (props) => {
         );
       }
     };
-  }, [isRepeating, next, volume, currentPlaylist, user, emitStoppedListening]);
+  }, [isRepeating, next, volume, currentPlaylist, user]);
 
   // Sync audio src when track changes (not when volume changes - that would reload and stop playback)
   useEffect(() => {
