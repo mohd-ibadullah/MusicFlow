@@ -13,20 +13,19 @@ const Sidebar = () => {
   const { isDark } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Only show functional menu items that have data or purpose
   const mainMenu = [
-    { id: 'home', path: '/', label: 'Home', Icon: Home, functional: true },
-    { id: 'search', path: '/search', label: 'Search', Icon: Search, functional: true },
-    { id: 'songs', path: '/songs', label: 'All Songs', Icon: Headphones, functional: songsData.length > 0 },
-    { id: 'library', path: '/library', label: 'Your Library', Icon: Library, functional: songsData.length > 0 },
-  ].filter(item => item.functional);
+    { id: 'home', path: '/', label: 'Home', Icon: Home },
+    { id: 'search', path: '/search', label: 'Search', Icon: Search },
+    { id: 'songs', path: '/songs', label: 'All Songs', Icon: Headphones },
+    { id: 'library', path: '/library', label: 'Your Library', Icon: Library },
+  ];
 
   const libraryMenu = [
-    { id: 'recent', path: '/recent', label: 'Recently Played', Icon: Clock, count: recentlyPlayed.length, functional: recentlyPlayed.length > 0 },
-    { id: 'liked', path: '/liked', label: 'Liked Songs', Icon: Heart, count: likedSongs.length, functional: likedSongs.length > 0 },
-    { id: 'playlists', path: '/playlists', label: 'Playlists', Icon: Music2, count: playlists.length, functional: playlists.length > 0 },
-    { id: 'albums', path: '/albums', label: 'Albums', Icon: Disc, count: albumsData.length, functional: albumsData.length > 0 },
-  ].filter(item => item.functional);
+    { id: 'recent', path: '/recent', label: 'Recently Played', Icon: Clock, count: recentlyPlayed.length },
+    { id: 'liked', path: '/liked', label: 'Liked Songs', Icon: Heart, count: likedSongs.length },
+    { id: 'playlists', path: '/playlists', label: 'Playlists', Icon: Music2, count: playlists.length },
+    { id: 'albums', path: '/albums', label: 'Albums', Icon: Disc, count: albumsData.length },
+  ];
 
   const handleCreatePlaylist = () => {
     setShowPlaylistModal(true);
@@ -37,7 +36,7 @@ const Sidebar = () => {
   };
 
   return (
-    <div className={`hidden lg:flex flex-col flex-shrink-0 w-72 min-w-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-700/50 transition-all duration-500 ${
+    <div className={`hidden lg:flex flex-col flex-shrink-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-700/50 transition-all duration-500 overflow-hidden ${
       isCollapsed ? 'w-16' : 'w-72'
     }`}>
       {/* Header */}
@@ -82,57 +81,55 @@ const Sidebar = () => {
           ))}
         </div>
 
-        {/* Library Section - Only show if there are functional items */}
-        {libraryMenu.length > 0 && (
-          <div className="px-6 py-6 mt-6 border-t border-gray-100/50 dark:border-gray-700/50">
-            <div className="flex items-center justify-between gap-3 mb-6">
-              {!isCollapsed && (
-                <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider leading-none">
-                  Your Library
-                </h3>
-              )}
-              {!isCollapsed && (
-                <button
-                  onClick={handleCreatePlaylist}
-                  className="flex items-center justify-center shrink-0 w-9 h-9 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/80 transition-all duration-200"
-                  title="Create playlist"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              {libraryMenu.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavigation(item.path)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all duration-200 ${
-                    location.pathname === item.path
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm border border-blue-200 dark:border-blue-700'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`}
-                >
-                  <div className="flex items-center space-x-4">
-                    {React.createElement(item.Icon, { className: "w-5 h-5 flex-shrink-0 stroke-[2]", "aria-hidden": true })}
-                    {!isCollapsed && <span className="font-medium text-sm">{item.label}</span>}
-                  </div>
-                  {!isCollapsed && item.count > 0 && (
-                    <span className={`text-xs px-3 py-1 rounded-full font-bold ${
-                      location.pathname === item.path
-                        ? 'bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-200'
-                        : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
-                    }`}>
-                      {item.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+        {/* Library Section */}
+        <div className="px-6 py-6 mt-6 border-t border-gray-100/50 dark:border-gray-700/50">
+          <div className="flex items-center justify-between gap-3 mb-6">
+            {!isCollapsed && (
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider leading-none">
+                Your Library
+              </h3>
+            )}
+            {!isCollapsed && (
+              <button
+                onClick={handleCreatePlaylist}
+                className="flex items-center justify-center shrink-0 w-9 h-9 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/80 transition-all duration-200"
+                title="Create playlist"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            )}
           </div>
-        )}
+
+          <div className="space-y-3">
+            {libraryMenu.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleNavigation(item.path)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all duration-200 ${
+                  location.pathname === item.path
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm border border-blue-200 dark:border-blue-700'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
+                }`}
+              >
+                <div className="flex items-center space-x-4">
+                  {React.createElement(item.Icon, { className: "w-5 h-5 flex-shrink-0 stroke-[2]", "aria-hidden": true })}
+                  {!isCollapsed && <span className="font-medium text-sm">{item.label}</span>}
+                </div>
+                {!isCollapsed && item.count > 0 && (
+                  <span className={`text-xs px-3 py-1 rounded-full font-bold ${
+                    location.pathname === item.path
+                      ? 'bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-200'
+                      : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                  }`}>
+                    {item.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Create Playlist Card - Only show when no playlists exist */}
         {!isCollapsed && playlists.length === 0 && (

@@ -273,14 +273,16 @@ const Player = () => {
           </div>
         </div>
 
-        {/* Live listeners indicator - always visible when track is playing */}
-        <div className="flex items-center ml-2 sm:ml-4 shrink-0">
-          <span className="text-xs font-semibold text-orange-600 dark:text-orange-400 flex items-center gap-1">
-            <Flame className="w-4 h-4" />
-            {activeListenersCount}{" "}
-            {activeListenersCount === 1 ? "user" : "users"} listening right now
-          </span>
-        </div>
+        {/* Live listeners indicator - only shown when someone is listening */}
+        {activeListenersCount > 0 && (
+          <div className="flex items-center ml-2 sm:ml-4 shrink-0">
+            <span className="text-xs font-semibold text-orange-600 dark:text-orange-400 flex items-center gap-1">
+              <Flame className="w-4 h-4" />
+              {activeListenersCount}{" "}
+              {activeListenersCount === 1 ? "user" : "users"} listening right now
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -46,7 +46,6 @@ const AllSongs = () => {
       params.set("sort", sortBy);
 
       const url = `${API_URL}/api/song/list?${params.toString()}`;
-      console.log("Fetching songs with filters:", url);
       const res = await axios.get(url);
       const data = res.data?.data ?? res.data ?? [];
       setSongs(Array.isArray(data) ? data : []);

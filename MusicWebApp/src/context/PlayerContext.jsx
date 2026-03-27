@@ -1,5 +1,4 @@
 // context/PlayerContext.jsx
-// context/PlayerContext.jsx - Update the import line at the top
 import React, {
   createContext,
   useContext,
@@ -87,18 +86,6 @@ const PlayerContextProvider = (props) => {
     playlists: [],
   });
 
-  // Safe data getters
-  const getSafeSongsData = () => (Array.isArray(songsData) ? songsData : []);
-  const getSafeAlbumsData = () => (Array.isArray(albumsData) ? albumsData : []);
-  const getSafePlaylists = () => (Array.isArray(playlists) ? playlists : []);
-  const getSafeLikedSongs = () => (Array.isArray(likedSongs) ? likedSongs : []);
-  const getSafeRecentlyPlayed = () =>
-    Array.isArray(recentlyPlayed) ? recentlyPlayed : [];
-  const getSafeRecommendations = () =>
-    Array.isArray(recommendations) ? recommendations : [];
-  const getSafeTrendingSongs = () =>
-    Array.isArray(trendingSongs) ? trendingSongs : [];
-
   // Load data from localStorage on mount (for both authenticated and non-authenticated users)
   useEffect(() => {
     try {
@@ -124,10 +111,6 @@ const PlayerContextProvider = (props) => {
     try {
       const likedSongsToSave = Array.isArray(likedSongs) ? likedSongs : [];
       localStorage.setItem("likedSongs", JSON.stringify(likedSongsToSave));
-      console.log(
-        "💾 Saved liked songs to localStorage:",
-        likedSongsToSave.length,
-      );
     } catch (error) {
       console.error("Error saving liked songs to localStorage:", error);
     }
@@ -141,10 +124,6 @@ const PlayerContextProvider = (props) => {
       localStorage.setItem(
         "recentlyPlayed",
         JSON.stringify(recentlyPlayedToSave),
-      );
-      console.log(
-        "💾 Saved recently played to localStorage:",
-        recentlyPlayedToSave.length,
       );
     } catch (error) {
       console.error("Error saving recently played to localStorage:", error);
@@ -189,8 +168,6 @@ const PlayerContextProvider = (props) => {
     (message, type = "info") => {
       if (themeToast && typeof themeToast.showToast === "function") {
         themeToast.showToast(message, type);
-      } else {
-        console.log(`[${type.toUpperCase()}]: ${message}`);
       }
     },
     [themeToast],
@@ -204,8 +181,6 @@ const PlayerContextProvider = (props) => {
     if (!sock || !listenerId) return;
 
     sock.emit("user_started_listening", { userId: listenerId });
-
-    console.log("Started listening:", listenerId);
   }, []);
 
   const emitStoppedListening = useCallback(() => {
@@ -258,8 +233,7 @@ const PlayerContextProvider = (props) => {
         return;
       }
 
-      const safeSongs = getSafeSongsData();
-      let song = safeSongs.find((item) => item?._id === id);
+      let song = songsData.find((item) => item?._id === id);
       if (!song && Array.isArray(playlist) && playlist.length > 0) {
         song = playlist.find((item) => item?._id === id);
       }
@@ -356,7 +330,7 @@ const PlayerContextProvider = (props) => {
       }
     },
     [
-      getSafeSongsData,
+      songsData,
       addToRecentlyPlayed,
       showToast,
     ],
@@ -503,9 +477,8 @@ const PlayerContextProvider = (props) => {
         return;
       }
 
-      const currentLikedSongs = getSafeLikedSongs();
-      const safeSongs = getSafeSongsData();
-      const song = safeSongs.find((s) => s._id === songId);
+      const currentLikedSongs = Array.isArray(likedSongs) ? likedSongs : [];
+      const song = songsData.find((s) => s._id === songId);
 
       if (!song) {
         showToast("Song not found", "error");
@@ -560,19 +533,18 @@ const PlayerContextProvider = (props) => {
         showToast("Failed to update liked songs", "error");
       }
     },
-    [getSafeLikedSongs, getSafeSongsData, showToast],
+    [likedSongs, songsData, showToast],
   );
 
   const isSongLiked = useCallback(
     (songId) => {
-      const likedSongs = getSafeLikedSongs();
       return likedSongs.some((likedSong) =>
         typeof likedSong === "string"
           ? likedSong === songId
           : likedSong._id === songId,
       );
     },
-    [getSafeLikedSongs],
+    [likedSongs],
   );
 
   // Search functionality
@@ -580,13 +552,6 @@ const PlayerContextProvider = (props) => {
     (query) => {
       const qRaw = typeof query === "string" ? query : "";
       const q = qRaw.trim();
-
-      console.log(
-        "Search query:",
-        q,
-        "Available songs:",
-        getSafeSongsData().length,
-      );
 
       if (!q) {
         setSearchResults({ songs: [], albums: [], playlists: [] });
@@ -607,9 +572,9 @@ const PlayerContextProvider = (props) => {
       };
 
       const needle = normalize(q);
-      const safeSongs = getSafeSongsData();
-      const safeAlbums = getSafeAlbumsData();
-      const safePlaylists = getSafePlaylists();
+      const safeSongs = songsData;
+      const safeAlbums = albumsData;
+      const safePlaylists = playlists;
 
       // Match songs by common string fields (be generous to backend shape)
       const matchedSongs = safeSongs.filter((song) => {
@@ -648,14 +613,6 @@ const PlayerContextProvider = (props) => {
         return hay.includes(needle);
       });
 
-      console.log(
-        "Search results - Songs:",
-        matchedSongs.length,
-        "Albums:",
-        matchedAlbums.length,
-        "Playlists:",
-        matchedPlaylists.length,
-      );
 
       setSearchResults({
         songs: matchedSongs,
@@ -1102,11 +1059,6 @@ const PlayerContextProvider = (props) => {
         const recentlyPlayedData = Array.isArray(response.data.recentlyPlayed)
           ? response.data.recentlyPlayed
           : [];
-        console.log(
-          "✅ Recently played loaded:",
-          recentlyPlayedData.length,
-          "songs",
-        );
         setRecentlyPlayed(recentlyPlayedData);
         return;
       }
@@ -1194,9 +1146,6 @@ const PlayerContextProvider = (props) => {
         }
         socketRef.current = socket;
 
-        socket.on("connect", () => {
-          console.log("[Socket] Connected to", baseUrl);
-        });
         socket.on("connect_error", (err) => {
           console.warn("[Socket] Connection error:", err.message);
         });
@@ -1365,13 +1314,13 @@ const PlayerContextProvider = (props) => {
       isRepeating,
 
       // Data
-      songsData: getSafeSongsData(),
-      albumsData: getSafeAlbumsData(),
-      playlists: getSafePlaylists(),
-      likedSongs: getSafeLikedSongs(),
-      recentlyPlayed: getSafeRecentlyPlayed(),
-      recommendations: getSafeRecommendations(),
-      trendingSongs: getSafeTrendingSongs(),
+      songsData,
+      albumsData,
+      playlists,
+      likedSongs,
+      recentlyPlayed,
+      recommendations,
+      trendingSongs,
       liveListening,
       activeListenersCount,
 

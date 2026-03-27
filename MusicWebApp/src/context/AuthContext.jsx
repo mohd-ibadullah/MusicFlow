@@ -17,40 +17,30 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Configure axios defaults
+  // Configure axios defaults from stored token
   useEffect(() => {
-    const storedToken = localStorage.getItem('token') || localStorage.getItem('auth_token');
-    const token = storedToken || null;
+    const token = localStorage.getItem('token');
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      // Normalize key for future reads
-      if (!localStorage.getItem('token')) {
-        localStorage.setItem('token', token);
-      }
     }
   }, []);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
+        const token = localStorage.getItem('token');
         if (token) {
-          // Verify token with backend
           const response = await axios.get(`${API_BASE_URL}/api/auth/profile`);
           if (response.data.success) {
             setUser(response.data.data.user);
           } else {
-            // Token is invalid, clear all auth state
             localStorage.removeItem('token');
-            localStorage.removeItem('auth_token');
             delete axios.defaults.headers.common['Authorization'];
             setUser(null);
           }
         }
       } catch (error) {
-        // Token is invalid or expired - clear all auth state
         localStorage.removeItem('token');
-        localStorage.removeItem('auth_token');
         delete axios.defaults.headers.common['Authorization'];
         setUser(null);
       } finally {
@@ -71,29 +61,22 @@ export const AuthProvider = ({ children }) => {
 
       if (response.data.success) {
         const { user: userData, token } = response.data.data;
-        
-        // Store token and user data
         localStorage.setItem('token', token);
-        localStorage.setItem('auth_token', token);
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         setUser(userData);
-        
         return userData;
       } else {
         throw new Error(response.data.message || 'Registration failed');
       }
     } catch (error) {
       let message = 'Registration failed';
-      
       if (error.response?.data?.errors) {
-        // Handle validation errors
         message = error.response.data.errors.join(', ');
       } else if (error.response?.data?.message) {
         message = error.response.data.message;
       } else if (error.message) {
         message = error.message;
       }
-      
       throw new Error(message);
     }
   };
@@ -107,36 +90,28 @@ export const AuthProvider = ({ children }) => {
 
       if (response.data.success) {
         const { user: userData, token } = response.data.data;
-        
-        // Store token and user data
         localStorage.setItem('token', token);
-        localStorage.setItem('auth_token', token);
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         setUser(userData);
-        
         return userData;
       } else {
         throw new Error(response.data.message || 'Login failed');
       }
     } catch (error) {
       let message = 'Login failed';
-      
       if (error.response?.data?.errors) {
-        // Handle validation errors
         message = error.response.data.errors.join(', ');
       } else if (error.response?.data?.message) {
         message = error.response.data.message;
       } else if (error.message) {
         message = error.message;
       }
-      
       throw new Error(message);
     }
   };
 
   const logout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('auth_token');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
     navigate('/login');
@@ -145,7 +120,6 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (profileData) => {
     try {
       const response = await axios.put(`${API_BASE_URL}/api/auth/profile`, profileData);
-      
       if (response.data.success) {
         setUser(response.data.data.user);
         return response.data.data.user;
@@ -164,7 +138,6 @@ export const AuthProvider = ({ children }) => {
         currentPassword,
         newPassword
       });
-      
       if (response.data.success) {
         return true;
       } else {

@@ -328,10 +328,10 @@ const DisplayHome = () => {
               {songsData.length > 0 ? 'Start Listening' : 'No Songs Available'}
             </button>
             <button 
-              onClick={() => showToast('Premium features coming soon!', 'info')}
+              onClick={() => navigate('/songs')}
               className="px-8 py-3 rounded-lg font-medium border-2 border-white/30 bg-white/10 text-white hover:bg-white/20 transition-all duration-200"
             >
-              Explore Premium
+              Browse All Songs
             </button>
           </div>
         </div>
