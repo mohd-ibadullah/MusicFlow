@@ -591,18 +591,7 @@ export const incrementPlayCount = async (req, res) => {
       });
     }
 
-    const song = await Song.findByIdAndUpdate(
-      songId,
-      { $inc: { playCount: 1 } },
-      { new: false }
-    ).lean();
-
-    if (song) {
-      logActivity({
-        type: "song_played",
-        message: `"${song.name}" was played`,
-      }).catch(() => {});
-    }
+    await Song.findByIdAndUpdate(songId, { $inc: { playCount: 1 } });
 
     res.status(200).json({
       success: true,
