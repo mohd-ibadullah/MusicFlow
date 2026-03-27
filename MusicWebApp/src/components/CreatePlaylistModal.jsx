@@ -18,7 +18,7 @@ const CreatePlaylistModal = () => {
       setLoading(true);
       // Call AI playlist generation API
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/playlist/generate`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/playlist/generate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

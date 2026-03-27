@@ -4,7 +4,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { AuthContext } from '../context/AuthContext.jsx';
 
-export const url = import.meta.env.VITE_API_URL || "http://localhost:4000";
+export const url = import.meta.env.VITE_API_URL ?? "";
 
 const AdminLogin = () => {
   const navigate = useNavigate();

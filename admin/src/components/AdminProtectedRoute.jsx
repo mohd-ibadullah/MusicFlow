@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext.jsx';
 
-export const url = import.meta.env.VITE_API_URL || "http://localhost:4000";
+export const url = import.meta.env.VITE_API_URL ?? "";
 
 const AdminProtectedRoute = ({ children }) => {
   let contextSafe = useContext(AuthContext) || {};

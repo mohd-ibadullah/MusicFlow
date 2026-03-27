@@ -13,7 +13,7 @@ import Navbar from "./components/Navbar";
 import TestUpload from "./components/TestUpload";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 
-export const url = import.meta.env.VITE_API_URL || "http://localhost:4000";
+export const url = import.meta.env.VITE_API_URL ?? "";
 
 const App = () => {
   return (

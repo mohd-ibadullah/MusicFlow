@@ -47,7 +47,7 @@ const PlayerContextProvider = (props) => {
   }, [user]);
   userRef.current = user;
 
-  const url = import.meta.env.VITE_API_URL || "http://localhost:4000";
+  const url = import.meta.env.VITE_API_URL ?? "";
 
   // Core data states
   const [songsData, setSongsData] = useState([]);
@@ -1272,7 +1272,7 @@ const PlayerContextProvider = (props) => {
     (async () => {
       try {
         const { io } = await import("socket.io-client");
-        const baseUrl = url.replace(/\/$/, "");
+        const baseUrl = (url || window.location.origin).replace(/\/$/, "");
         const socket = io(baseUrl, { transports: ["websocket", "polling"] });
         if (!mounted) {
           socket.disconnect();

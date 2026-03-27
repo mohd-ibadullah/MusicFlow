@@ -34,7 +34,7 @@ const DisplayPlaylist = () => {
       }
 
       // If not found locally, try backend
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || "http://localhost:4000"}/api/playlist/${id}`);
+      const response = await axios.get(`${import.meta.env.VITE_API_URL ?? ""}/api/playlist/${id}`);
       if (response.data.success) {
         setPlaylist(response.data.playlist);
       } else {
