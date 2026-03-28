@@ -60,10 +60,21 @@ const PlayerContextProvider = (props) => {
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
 
   // Player state
-  const [track, setTrack] = useState(null);
+  const [track, setTrack] = useState(() => {
+    try {
+      const saved = localStorage.getItem("currentTrack");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return null; // Will fallback to songsData[0] inside getSongsData
+  });
+  const trackRef = useRef(track); // Keep track of current song for socket emissions
   const [playStatus, setPlayStatus] = useState(false);
   // Keep a ref in sync so closures always read the live value
   useEffect(() => { playStatusRef.current = playStatus; }, [playStatus]);
+  // Sync track to ref
+  useEffect(() => { trackRef.current = track; }, [track]);
   const [time, setTime] = useState({
     currentTime: { second: 0, minute: 0 },
     totalTime: { second: 0, minute: 0 },
@@ -73,8 +84,30 @@ const PlayerContextProvider = (props) => {
   const [isShuffled, setIsShuffled] = useState(false);
   const [isRepeating, setIsRepeating] = useState(false);
   const [volume, setVolume] = useState(80);
-  const [currentPlaylist, setCurrentPlaylist] = useState([]);
-  const [currentPlaylistIndex, setCurrentPlaylistIndex] = useState(0);
+  const [currentPlaylist, setCurrentPlaylist] = useState(() => {
+    try {
+      const saved = localStorage.getItem("currentPlaylist");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
+  const [currentPlaylistIndex, setCurrentPlaylistIndex] = useState(() => {
+    const saved = localStorage.getItem("currentPlaylistIndex");
+    return saved !== null ? parseInt(saved, 10) : 0;
+  });
+
+  // Persist track and queue
+  useEffect(() => {
+    if (track) localStorage.setItem("currentTrack", JSON.stringify(track));
+  }, [track]);
+  useEffect(() => {
+    localStorage.setItem("currentPlaylist", JSON.stringify(currentPlaylist || []));
+  }, [currentPlaylist]);
+  useEffect(() => {
+    localStorage.setItem("currentPlaylistIndex", currentPlaylistIndex.toString());
+  }, [currentPlaylistIndex]);
 
   // User data
   const [likedSongs, setLikedSongs] = useState([]);
@@ -180,10 +213,19 @@ const PlayerContextProvider = (props) => {
   const emitStartedListening = useCallback(() => {
     const sock = socketRef.current;
     const listenerId = listenerIdRef.current;
+    const currentTrack = trackRef.current;
 
-    if (!sock || !listenerId) return;
+    if (!sock || !listenerId) {
+      console.warn("[Socket] Cannot emit: socket or listenerId not ready");
+      return;
+    }
 
-    sock.emit("user_started_listening", { userId: listenerId });
+    sock.emit("user_started_listening", {
+      userId: listenerId,
+      songId: currentTrack?._id || null,
+      songName: currentTrack?.name || null,
+      userName: userRef.current?.name || "Anonymous"
+    });
   }, []);
 
   const emitStoppedListening = useCallback(() => {
@@ -239,7 +281,19 @@ const PlayerContextProvider = (props) => {
         return;
       }
 
-      // If the same song is already loaded, just toggle play/pause
+      let song = songsData.find((item) => item?._id === id);
+      if (!song && Array.isArray(playlist) && playlist.length > 0) {
+        song = playlist.find((item) => item?._id === id);
+      }
+
+      // Always sync the underlying array queue context so Next/Prev buttons map correctly
+      // even if the user clicks a song that is already actively playing.
+      const safePlaylist = Array.isArray(playlist) && playlist.length > 0 ? playlist : songsData;
+      setCurrentPlaylist(safePlaylist);
+      const songIndex = safePlaylist.findIndex((item) => item?._id === id);
+      setCurrentPlaylistIndex(songIndex >= 0 ? songIndex : 0);
+
+      // If the same song is already loaded, just toggle play/pause now that context is updated
       if (track && track._id === id) {
         if (playStatusRef.current) {
           pause();
@@ -249,10 +303,6 @@ const PlayerContextProvider = (props) => {
         return;
       }
 
-      let song = songsData.find((item) => item?._id === id);
-      if (!song && Array.isArray(playlist) && playlist.length > 0) {
-        song = playlist.find((item) => item?._id === id);
-      }
       if (!song) {
         showToast("Song not found", "error");
         return;
@@ -265,11 +315,8 @@ const PlayerContextProvider = (props) => {
 
       try {
         setTrack(song);
+        trackRef.current = song; // Update ref immediately for socket emissions
         addToRecentlyPlayed(song);
-        const safePlaylist = Array.isArray(playlist) ? playlist : songsData;
-        setCurrentPlaylist(safePlaylist);
-        const songIndex = safePlaylist.findIndex((item) => item?._id === id);
-        setCurrentPlaylistIndex(songIndex >= 0 ? songIndex : 0);
 
         if (audioRef.current) {
           // Mark transition so emitStoppedListening is suppressed during load
@@ -295,27 +342,6 @@ const PlayerContextProvider = (props) => {
                 setPlayStatus(true);
                 showToast(`Now playing: ${song.name}`, "success");
                 // Socket emit is handled exclusively by el.onplay (audio element callback)
-
-                // Track a "play" only once per track start (even if events fire multiple times)
-                try {
-                  const now = Date.now();
-                  const prev = lastPlayCountedRef.current || {};
-                  const sameSongRecently =
-                    prev.songId === song._id && now - (prev.at || 0) < 15000;
-                  if (!sameSongRecently) {
-                    lastPlayCountedRef.current = { songId: song._id, at: now };
-                    axios
-                      .post(`${url}/api/song/play/${song._id}`)
-                      .catch((e) =>
-                        console.warn(
-                          "playCount increment failed:",
-                          e?.response?.data?.message || e.message,
-                        ),
-                      );
-                  }
-                } catch (e) {
-                  console.warn("playCount increment skipped:", e.message);
-                }
               })
               .catch((error) => {
                 isTransitioningRef.current = false;
@@ -485,7 +511,7 @@ const PlayerContextProvider = (props) => {
     const wasPlaying = !audioRef.current.paused;
     audioRef.current.currentTime = seekTime;
     if (wasPlaying) {
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch(() => { });
     }
   }, []);
 
@@ -528,21 +554,15 @@ const PlayerContextProvider = (props) => {
           : likedSong._id === songId,
       );
 
-      // Optimistic update - update UI immediately
+      // Optimistic update - update UI silently immediately
       if (isCurrentlyLiked) {
-        // Unlike the song
-        const updatedLikedSongs = currentLikedSongs.filter((likedSong) =>
+        setLikedSongs(currentLikedSongs.filter((likedSong) =>
           typeof likedSong === "string"
             ? likedSong !== songId
             : likedSong._id !== songId,
-        );
-        setLikedSongs(updatedLikedSongs);
-        showToast(`Removed "${song.name}" from liked songs`, "info");
+        ));
       } else {
-        // Like the song
-        const updatedLikedSongs = [...currentLikedSongs, song];
-        setLikedSongs(updatedLikedSongs);
-        showToast(`Added "${song.name}" to liked songs`, "success");
+        setLikedSongs([...currentLikedSongs, song]);
       }
 
       try {
@@ -561,6 +581,12 @@ const PlayerContextProvider = (props) => {
           showToast(
             response.data.message || "Failed to update liked songs",
             "error",
+          );
+        } else {
+          // Fire accurate success toast after DB confirms
+          showToast(
+            isCurrentlyLiked ? `Removed "${song.name}" from liked songs` : `Added "${song.name}" to liked songs`,
+            isCurrentlyLiked ? "info" : "success"
           );
         }
       } catch (error) {
@@ -678,6 +704,17 @@ const PlayerContextProvider = (props) => {
         return { success: false };
       }
 
+      const tempId = `temp-${Date.now()}`;
+      const optimisticPlaylist = {
+        _id: tempId,
+        name: name.trim(),
+        description: "My playlist",
+        songs: []
+      };
+
+      // Optimistically add the playlist to the UI instantly
+      setPlaylists((prev) => [...prev, optimisticPlaylist]);
+
       try {
         const response = await axios.post(`${url}/api/playlist/create`, {
           name: name.trim(),
@@ -685,10 +722,18 @@ const PlayerContextProvider = (props) => {
         });
 
         if (response.data.success) {
-          await getPlaylistsData();
+          if (response.data.playlist) {
+            setPlaylists((prev) =>
+              prev.map(p => p._id === tempId ? response.data.playlist : p)
+            );
+          }
+          // Fetch authoritative state in background
+          getPlaylistsData();
           showToast("Playlist created successfully", "success");
           return { success: true };
         } else {
+          // Revert speculative update
+          setPlaylists((prev) => prev.filter(p => p._id !== tempId));
           showToast(
             response.data.message || "Failed to create playlist",
             "error",
@@ -696,6 +741,8 @@ const PlayerContextProvider = (props) => {
           return { success: false };
         }
       } catch (error) {
+        // Revert speculative update
+        setPlaylists((prev) => prev.filter(p => p._id !== tempId));
         console.error("Error creating playlist:", error);
         const message =
           error.response?.data?.message || "Failed to create playlist";
@@ -785,18 +832,17 @@ const PlayerContextProvider = (props) => {
           return { success: false };
         }
 
+        // Check if song already exists in playlist before making any changes
+        const playlistObj = playlists.find(p => p._id === playlistId);
+        if (playlistObj && playlistObj.songs?.some(song => song._id === songId)) {
+          showToast("Song already exists in this playlist", "error");
+          return { success: false };
+        }
+
         // Optimistically update the local state first for instant UI update
         setPlaylists((prevPlaylists) =>
           prevPlaylists.map((playlist) => {
             if (playlist._id === playlistId) {
-              // Check if song already exists in playlist
-              const songExists = playlist.songs?.some(
-                (song) => song._id === songId,
-              );
-              if (songExists) {
-                showToast("Song already exists in this playlist", "error");
-                return playlist;
-              }
               return {
                 ...playlist,
                 songs: [...(playlist.songs || []), songToAdd],
@@ -812,17 +858,15 @@ const PlayerContextProvider = (props) => {
         });
 
         if (response.data.success) {
-          // Refresh from backend to ensure consistency
-          try {
-            const response = await axios.get(`${url}/api/playlist/list`);
-            if (response.data.success) {
-              const pls = Array.isArray(response.data.playlists)
-                ? response.data.playlists
-                : [];
-              setPlaylists(pls);
-            }
-          } catch (refreshError) {
-            console.error("Error refreshing playlists:", refreshError);
+          // Sync exact state from API response to prevent UI flickering
+          if (response.data.playlist) {
+            setPlaylists((prevPlaylists) =>
+              prevPlaylists.map((playlist) =>
+                playlist._id === response.data.playlist._id
+                  ? response.data.playlist
+                  : playlist
+              )
+            );
           }
           showToast("Song added to playlist", "success");
           return { success: true };
@@ -907,17 +951,15 @@ const PlayerContextProvider = (props) => {
         });
 
         if (response.data.success) {
-          // Refresh from backend to ensure consistency
-          try {
-            const response = await axios.get(`${url}/api/playlist/list`);
-            if (response.data.success) {
-              const pls = Array.isArray(response.data.playlists)
-                ? response.data.playlists
-                : [];
-              setPlaylists(pls);
-            }
-          } catch (refreshError) {
-            console.error("Error refreshing playlists:", refreshError);
+          // Sync exact state from API response to prevent UI flickering
+          if (response.data.playlist) {
+            setPlaylists((prevPlaylists) =>
+              prevPlaylists.map((playlist) =>
+                playlist._id === response.data.playlist._id
+                  ? response.data.playlist
+                  : playlist
+              )
+            );
           }
           showToast("Song removed from playlist", "success");
           return { success: true };
@@ -1166,6 +1208,8 @@ const PlayerContextProvider = (props) => {
 
   // Socket.IO: live listening activity
   const [activeListenersCount, setActiveListenersCount] = useState(0);
+  const isSocketConnectedRef = useRef(false);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -1178,18 +1222,38 @@ const PlayerContextProvider = (props) => {
         }
         socketRef.current = socket;
 
+        socket.on("connect", () => {
+          isSocketConnectedRef.current = true;
+          console.log("[Socket] Connected - fetching initial listener count");
+          socket.emit("get_listeners");
+        });
+
+        socket.on("disconnect", () => {
+          isSocketConnectedRef.current = false;
+          console.log("[Socket] Disconnected");
+        });
+
         socket.on("connect_error", (err) => {
           console.warn("[Socket] Connection error:", err.message);
         });
 
         socket.on("user_listening", (payload) => {
+          console.log("[Socket] Received user_listening:", payload);
           setLiveListening((prev) => {
             const next = [
               { ...payload, at: Date.now() },
               ...(prev || []),
             ].slice(0, 5);
+            console.log("[Socket] Updated liveListening:", next);
             return next;
           });
+        });
+
+        socket.on("recent_live_events", (eventsPayload) => {
+          console.log("[Socket] Restoring recent live activity from cache");
+          if (Array.isArray(eventsPayload)) {
+            setLiveListening(eventsPayload.map(e => ({ ...e, at: Date.now() })));
+          }
         });
 
         socket.on("users_listening", (count) => {
@@ -1205,6 +1269,7 @@ const PlayerContextProvider = (props) => {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
+        isSocketConnectedRef.current = false;
       }
     };
   }, [url]);
@@ -1352,6 +1417,7 @@ const PlayerContextProvider = (props) => {
       // Features state
       isShuffled,
       isRepeating,
+      currentPlaylist,
 
       // Data
       songsData,
@@ -1438,6 +1504,22 @@ const PlayerContextProvider = (props) => {
             // can fire in the microtask gap between play() resolving and .then() running.
             isTransitioningRef.current = false;
             emitStartedListening();
+
+            const currentTrack = trackRef.current;
+            if (currentTrack) {
+              const now = Date.now();
+              const prev = lastPlayCountedRef.current || {};
+              const sameSongRecently = prev.songId === currentTrack._id && now - (prev.at || 0) < 15000;
+              
+              if (!sameSongRecently) {
+                lastPlayCountedRef.current = { songId: currentTrack._id, at: now };
+                
+                axios.post(`${url}/api/song/play/${currentTrack._id}`, {
+                  listenerId: listenerIdRef.current,
+                  userName: userRef.current?.name || "Anonymous",
+                }).catch(err => console.debug("Play count error:", err.message));
+              }
+            }
           };
 
           el.onpause = () => {

@@ -4,6 +4,7 @@ import { Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SongCard from "./SongCard";
 import SkeletonLoader from "./SkeletonLoader";
+import CustomDropdown from "./CustomDropdown";
 import { usePlayer } from "../context/PlayerContext";
 import { useToast } from "../context/ThemeContext";
 
@@ -162,33 +163,17 @@ const LikedSongs = () => {
           />
         </div>
 
-        <div className="relative">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="appearance-none px-6 py-3 pr-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 cursor-pointer hover:shadow-lg font-semibold text-gray-700 dark:text-gray-300 min-w-[180px]"
-          >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="name">Name A-Z</option>
-            <option value="album">Album A-Z</option>
-          </select>
-          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-            <svg
-              className="w-5 h-5 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </div>
-        </div>
+        <CustomDropdown 
+          options={[
+            { value: "newest", label: "Newest First" },
+            { value: "oldest", label: "Oldest First" },
+            { value: "name", label: "Name A-Z" },
+            { value: "album", label: "Album A-Z" },
+          ]}
+          value={sortBy}
+          onChange={setSortBy}
+          className="w-full sm:w-auto min-w-[180px]"
+        />
       </div>
 
       {/* Songs Grid */}

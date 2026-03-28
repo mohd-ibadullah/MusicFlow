@@ -1,22 +1,20 @@
 import { v2 as cloudinary } from "cloudinary";
 import Album from "../models/albumModel.js";
 import fs from "fs";
-import { cacheGet, cacheSet, cacheDel } from "../utils/cache.js";
+import { cacheGet, cacheSet, CACHE_KEYS, clearAlbumCaches } from "../services/cacheService.js";
 import logActivity from "../utils/logActivity.js";
-
-const CACHE_ALBUMS_KEY = "albums:list";
 
 const addAlbum = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "No image file provided" 
+        message: "No image file provided"
       });
     }
 
     const { name, desc, bgColor } = req.body;
-    
+
     if (!name || !desc || !bgColor) {
       return res.status(400).json({
         success: false,
@@ -33,7 +31,7 @@ const addAlbum = async (req, res) => {
       } catch (cleanupError) {
         console.warn("⚠️ Could not clean up temp file:", cleanupError.message);
       }
-      
+
       return res.status(400).json({
         success: false,
         message: "Invalid file type. Please upload JPEG, PNG, GIF, or WebP images only."
@@ -41,7 +39,7 @@ const addAlbum = async (req, res) => {
     }
 
     const imageFile = req.file.path;
-    
+
     try {
       const imageUpload = await cloudinary.uploader.upload(imageFile, {
         resource_type: "image",
@@ -49,8 +47,8 @@ const addAlbum = async (req, res) => {
 
       const album = new Album({ name, desc, bgColor, image: imageUpload.secure_url });
       await album.save();
-      await cacheDel(CACHE_ALBUMS_KEY);
-      logActivity({ type: "album_added", message: `Album "${album.name}" was added` });
+      await clearAlbumCaches();
+      logActivity({ type: "album_added", message: `Album "${album.name}" was added`, req });
 
       try {
         fs.unlinkSync(imageFile);
@@ -65,14 +63,14 @@ const addAlbum = async (req, res) => {
       });
     } catch (cloudinaryError) {
       console.error("❌ Cloudinary error:", cloudinaryError);
-      
+
       // Clean up temp file on error
       try {
         fs.unlinkSync(imageFile);
       } catch (cleanupError) {
         console.warn("⚠️ Could not clean up temp file on error:", cleanupError.message);
       }
-      
+
       res.status(400).json({
         success: false,
         message: "Cloudinary upload failed. Please check your image file and try again.",
@@ -81,17 +79,17 @@ const addAlbum = async (req, res) => {
     }
   } catch (error) {
     console.error("❌ Album upload error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Error adding album", 
-      error: error.message 
+      message: "Error adding album",
+      error: error.message
     });
   }
 };
 
 const listAlbum = async (req, res) => {
   try {
-    const cached = await cacheGet(CACHE_ALBUMS_KEY);
+    const cached = await cacheGet(CACHE_KEYS.ALBUMS_LIST);
     if (cached) {
       return res.status(200).json({
         success: true,
@@ -100,18 +98,18 @@ const listAlbum = async (req, res) => {
       });
     }
     const allAlbums = await Album.find({}).sort({ createdAt: -1 }).lean();
-    await cacheSet(CACHE_ALBUMS_KEY, { allAlbums }, 120);
-    res.status(200).json({ 
+    await cacheSet(CACHE_KEYS.ALBUMS_LIST, { allAlbums }, 120);
+    res.status(200).json({
       success: true,
-      message: "Albums fetched successfully", 
-      allAlbums 
+      message: "Albums fetched successfully",
+      allAlbums
     });
   } catch (error) {
     console.error("List albums error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Error fetching albums", 
-      error: error.message 
+      message: "Error fetching albums",
+      error: error.message
     });
   }
 };
@@ -120,22 +118,22 @@ const removeAlbum = async (req, res) => {
   try {
     const result = await Album.findByIdAndDelete(req.body.id);
     if (!result) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "Album not found" 
+        message: "Album not found"
       });
     }
-    await cacheDel(CACHE_ALBUMS_KEY);
-    res.status(200).json({ 
+    await clearAlbumCaches();
+    res.status(200).json({
       success: true,
-      message: "Album deleted successfully" 
+      message: "Album deleted successfully"
     });
   } catch (error) {
     console.error("Remove album error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Error deleting album", 
-      error: error.message 
+      message: "Error deleting album",
+      error: error.message
     });
   }
 };

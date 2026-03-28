@@ -6,14 +6,14 @@ export const createPlaylist = async (req, res) => {
   try {
     const { name, description } = req.body;
     const userId = req.user?.userId;
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
       });
     }
-    
+
     const playlist = new Playlist({
       name,
       description: description || "My playlist",
@@ -22,8 +22,9 @@ export const createPlaylist = async (req, res) => {
     await playlist.save();
     logActivity({
       type: "playlist_created",
-      message: `Playlist "${playlist.name}" was created`,
+      message: `${req.user?.name || "User"} created playlist "${playlist.name}"`,
       userId: userId,
+      req,
     });
 
     res.status(201).json({ success: true, playlist });
@@ -36,20 +37,20 @@ export const createPlaylist = async (req, res) => {
 export const getPlaylists = async (req, res) => {
   try {
     const userId = req.user?.userId;
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
       });
     }
-    
+
     const playlists = await Playlist.find({ user: userId }).populate('songs');
     res.status(200).json({ success: true, playlists });
   } catch (error) {
     console.error("Error fetching playlists:", error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
@@ -59,26 +60,26 @@ export const getPlaylists = async (req, res) => {
 export const getPlaylistById = async (req, res) => {
   try {
     const userId = req.user?.userId;
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
       });
     }
-    
-    const playlist = await Playlist.findOne({ 
-      _id: req.params.id, 
-      user: userId 
+
+    const playlist = await Playlist.findOne({
+      _id: req.params.id,
+      user: userId
     }).populate('songs');
-    
+
     if (!playlist) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Playlist not found or access denied" 
+      return res.status(404).json({
+        success: false,
+        message: "Playlist not found or access denied"
       });
     }
-    
+
     res.status(200).json({ success: true, playlist });
   } catch (error) {
     console.error("Error fetching playlist:", error);
@@ -90,33 +91,41 @@ export const addSongToPlaylist = async (req, res) => {
   try {
     const { playlistId, songId } = req.body;
     const userId = req.user?.userId;
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
       });
     }
-    
+
     const playlist = await Playlist.findOne({ _id: playlistId, user: userId });
     const song = await Song.findById(songId);
-    
+
     if (!playlist) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Playlist not found or access denied" 
+      return res.status(404).json({
+        success: false,
+        message: "Playlist not found or access denied"
       });
     }
-    
+
     if (!song) {
       return res.status(404).json({ success: false, message: "Song not found" });
     }
 
     const songExists = playlist.songs.some(song => song.toString() === songId);
-    
+
     if (!songExists) {
       playlist.songs.push(songId);
       await playlist.save();
+
+      // Log adding a song to a playlist
+      await logActivity({
+        type: "song_added",
+        message: `${req.user?.name || "User"} added "${song.name}" to playlist "${playlist.name}"`,
+        userId: userId,
+        req,
+      });
     }
 
     const updatedPlaylist = await Playlist.findById(playlistId).populate('songs');
@@ -131,22 +140,22 @@ export const deletePlaylist = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
       });
     }
-    
+
     const playlist = await Playlist.findOneAndDelete({ _id: id, user: userId });
     if (!playlist) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Playlist not found or access denied" 
+      return res.status(404).json({
+        success: false,
+        message: "Playlist not found or access denied"
       });
     }
-    
+
     res.status(200).json({ success: true, message: "Playlist deleted successfully" });
   } catch (error) {
     console.error("Error deleting playlist:", error);
@@ -158,30 +167,30 @@ export const removeSongFromPlaylist = async (req, res) => {
   try {
     const { playlistId, songId } = req.body;
     const userId = req.user?.userId;
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
       });
     }
-    
+
     const playlist = await Playlist.findOne({ _id: playlistId, user: userId });
-    
+
     if (!playlist) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Playlist not found or access denied" 
+      return res.status(404).json({
+        success: false,
+        message: "Playlist not found or access denied"
       });
     }
 
     const initialLength = playlist.songs.length;
     playlist.songs = playlist.songs.filter(song => song.toString() !== songId);
-    
+
     if (playlist.songs.length === initialLength) {
       return res.status(404).json({ success: false, message: "Song not found in playlist" });
     }
-    
+
     await playlist.save();
 
     const updatedPlaylist = await Playlist.findById(playlistId).populate('songs');
@@ -212,7 +221,7 @@ function extractKeywords(prompt) {
  */
 async function findSongsByKeywords(keywords) {
   const searchRegex = new RegExp(keywords.join('|'), 'i');
-  
+
   const songs = await Song.find({
     $or: [
       { name: searchRegex },
@@ -222,7 +231,7 @@ async function findSongsByKeywords(keywords) {
       { album: searchRegex }
     ]
   }).sort({ playCount: -1, likeCount: -1 }).limit(50).lean();
-  
+
   return songs;
 }
 
@@ -241,8 +250,8 @@ function generatePlaylistName(prompt) {
 export const cleanupOldPlaylists = async (req, res) => {
   try {
     const result = await Playlist.deleteMany({ user: { $exists: false } });
-    res.status(200).json({ 
-      success: true, 
+    res.status(200).json({
+      success: true,
       message: `Deleted ${result.deletedCount} old playlists without user field`,
       deletedCount: result.deletedCount
     });
@@ -280,33 +289,33 @@ export const generatePlaylist = async (req, res) => {
   try {
     const { prompt } = req.body;
     const userId = req.user?.userId;
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
       });
     }
-    
+
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Prompt is required and must be a non-empty string" 
+      return res.status(400).json({
+        success: false,
+        message: "Prompt is required and must be a non-empty string"
       });
     }
-    
+
     const keywords = extractKeywords(prompt.toLowerCase());
-    
+
     // Find matching songs
     const matchingSongs = await findSongsByKeywords(keywords);
-    
+
     if (matchingSongs.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "No songs found matching the prompt. Try different keywords." 
+      return res.status(404).json({
+        success: false,
+        message: "No songs found matching the prompt. Try different keywords."
       });
     }
-    
+
     // Create playlist
     const playlistName = generatePlaylistName(prompt);
     const playlist = new Playlist({
@@ -316,21 +325,28 @@ export const generatePlaylist = async (req, res) => {
       songs: matchingSongs.slice(0, 20).map(song => song._id), // Limit to 20 songs
       isAIGenerated: true
     });
-    
+
     await playlist.save();
     await playlist.populate('songs');
-    
-    res.status(201).json({ 
-      success: true, 
+
+    logActivity({
+      type: "playlist_created",
+      message: `AI Playlist "${playlist.name}" was generated`,
+      userId: userId,
+      req,
+    });
+
+    res.status(201).json({
+      success: true,
       playlist,
-      message: `Generated playlist "${playlistName}" with ${playlist.songs.length} songs` 
+      message: `Generated playlist "${playlistName}" with ${playlist.songs.length} songs`
     });
   } catch (error) {
     console.error("Error generating AI playlist:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Error generating playlist", 
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    res.status(500).json({
+      success: false,
+      message: "Error generating playlist",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

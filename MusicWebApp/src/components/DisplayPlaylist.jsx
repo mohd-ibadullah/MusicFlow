@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { usePlayer } from "../context/PlayerContext";
 import { useToast } from "../context/ThemeContext";
+import Tooltip from "./Tooltip";
 
 const DisplayPlaylist = () => {
   const { id } = useParams();
@@ -122,9 +123,11 @@ const DisplayPlaylist = () => {
         <div className="w-48 h-48 bg-blue-500 rounded-xl shadow-lg flex items-center justify-center">
           <span className="text-white text-6xl">♫</span>
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0 w-full">
           <p className="text-gray-600 dark:text-gray-300 text-sm font-medium mb-2">PLAYLIST</p>
-          <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-6">{playlist.name}</h1>
+          <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-6 whitespace-nowrap overflow-hidden text-ellipsis w-full">
+            {playlist?.name || ""}
+          </h1>
           <p className="text-gray-600 dark:text-gray-300 mb-2">
             {playlist.description || "Your personalized playlist"}
           </p>
@@ -133,17 +136,21 @@ const DisplayPlaylist = () => {
           </p>
           
           {/* Playlist Actions */}
-          <div className="flex gap-4 mt-4">
+          <div className="flex gap-4 mt-6">
             <button
               onClick={handlePlayPlaylist}
               disabled={!playlist.songs || playlist.songs.length === 0}
-              className={playlist.songs?.length > 0 ? 'btn-primary py-2' : 'btn-primary opacity-50 cursor-not-allowed py-2'}
+              className={`h-10 px-6 flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 shadow-md ${
+                playlist.songs?.length > 0 
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                  : 'bg-gray-400 dark:bg-gray-600 text-gray-200 opacity-50 cursor-not-allowed'
+              }`}
             >
-              {playlist.songs?.length > 0 ? 'Play' : 'No Songs'}
+              {playlist.songs?.length > 0 ? 'Play Playlist' : 'No Songs'}
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="px-6 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-all duration-200"
+              className="h-10 px-6 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-md"
             >
               Delete Playlist
             </button>
@@ -217,27 +224,29 @@ const DisplayPlaylist = () => {
                 <div className="col-span-1 text-center text-gray-600 dark:text-gray-400 text-sm">
                   {song.duration}
                 </div>
-                <div className="col-span-1 flex justify-center gap-2">
-                  <button
-                    onClick={() => playWithId(song._id, playlist.songs)}
-                    className="btn-primary opacity-0 group-hover:opacity-100 p-2 min-w-0"
-                    title={isPlaying ? "Pause" : "Play"}
-                  >
-                    {isPlaying ? (
-                      <Pause className="w-4 h-4 text-white shrink-0" size={16} strokeWidth={2.5} />
-                    ) : (
-                      <Play className="w-4 h-4 text-white shrink-0" size={16} strokeWidth={2.5} />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setShowRemoveSong(song._id)}
-                    className="opacity-0 group-hover:opacity-100 bg-red-500 text-white p-2 rounded-lg transition-all duration-200"
-                    title="Remove from playlist"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+                <div className="col-span-1 flex justify-center items-center gap-2">
+                  <Tooltip content={isPlaying ? "Pause" : "Play"} position="bottom">
+                    <button
+                      onClick={() => playWithId(song._id, playlist.songs)}
+                      className="flex items-center justify-center w-8 h-8 opacity-0 group-hover:opacity-100 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 shadow-sm"
+                    >
+                      {isPlaying ? (
+                        <Pause className="w-4 h-4 text-white" />
+                      ) : (
+                        <Play className="w-4 h-4 text-white ml-0.5" />
+                      )}
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Remove from playlist" position="bottom">
+                    <button
+                      onClick={() => setShowRemoveSong(song._id)}
+                      className="flex items-center justify-center w-8 h-8 opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 shadow-sm"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
               );

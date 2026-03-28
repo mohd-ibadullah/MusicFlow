@@ -13,22 +13,27 @@ import { useToast } from "../context/ThemeContext";
 const DisplayHome = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { 
-    songsData, 
-    albumsData, 
-    playlists, 
-    searchQuery, 
-    searchResults, 
-    likedSongs, 
+  const {
+    songsData,
+    albumsData,
+    playlists,
+    searchQuery,
+    searchResults,
+    likedSongs,
     recentlyPlayed,
     recommendations,
     trendingSongs,
     liveListening,
     playWithId
   } = usePlayer();
-  
+
+  // Debug: log liveListening changes
+  React.useEffect(() => {
+    console.log("[DisplayHome] liveListening updated:", liveListening);
+  }, [liveListening]);
+
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const [sectionPages, setSectionPages] = useState({
     recentlyPlayed: 0,
     likedSongs: 0,
@@ -44,16 +49,16 @@ const DisplayHome = () => {
   // Format last played date
   const formatLastPlayed = (dateString) => {
     if (!dateString) return "—";
-    
+
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return "—";
-    
+
     const now = new Date();
     const diffInMs = now - date;
     const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
     const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
     const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffInMinutes < 1) return "Just now";
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInHours < 24) return `${diffInHours}h ago`;
@@ -62,7 +67,7 @@ const DisplayHome = () => {
   };
 
   // Memoized filtered data
-  const likedSongsData = useMemo(() => 
+  const likedSongsData = useMemo(() =>
     songsData.filter(song => likedSongs.includes(song._id)),
     [songsData, likedSongs]
   );
@@ -120,10 +125,10 @@ const DisplayHome = () => {
   };
 
   // Section Header Component with Navigation
-  const SectionHeader = ({ 
-    title, 
-    data = [], 
-    section, 
+  const SectionHeader = ({
+    title,
+    data = [],
+    section,
     onSeeAll,
     showSeeAll = true,
     showNavigation = false,
@@ -131,63 +136,63 @@ const DisplayHome = () => {
   }) => {
     const displayCount = seeAllCount ?? data.length;
     return (
-    <div className="flex items-center justify-between mb-6">
-      <div>
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{title}</h2>
-        {data.length > 0 && (
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            {data.length} {data.length === 1 ? 'item' : 'items'}
-          </p>
-        )}
-      </div>
-      
-      <div className="flex items-center space-x-3">
-        {/* Navigation Buttons - Only show if there are multiple pages */}
-        {showNavigation && data.length > ITEMS_PER_PAGE && (
-          <div className="flex items-center space-x-2 mr-4">
-            <button
-              onClick={() => handlePreviousPage(section)}
-              disabled={!hasPreviousPage(section)}
-              className="btn-arrow"
-              title="Previous page"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <button
-              onClick={() => handleNextPage(section, data)}
-              disabled={!hasNextPage(data, section)}
-              className="btn-arrow"
-              title="Next page"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        )}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{title}</h2>
+          {data.length > 0 && (
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+              {data.length} {data.length === 1 ? 'item' : 'items'}
+            </p>
+          )}
+        </div>
 
-        {/* See All Button - Only show if there are more items than displayed */}
-        {showSeeAll && (seeAllCount !== undefined ? displayCount > 0 : data.length > ITEMS_PER_PAGE) && (
-          <button 
-            onClick={onSeeAll}
-            className="btn-ghost text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-4 py-2"
-          >
-            See all ({displayCount})
-          </button>
-        )}
+        <div className="flex items-center space-x-3">
+          {/* Navigation Buttons - Only show if there are multiple pages */}
+          {showNavigation && data.length > ITEMS_PER_PAGE && (
+            <div className="flex items-center space-x-2 mr-4">
+              <button
+                onClick={() => handlePreviousPage(section)}
+                disabled={!hasPreviousPage(section)}
+                className="btn-arrow"
+                title="Previous page"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => handleNextPage(section, data)}
+                disabled={!hasNextPage(data, section)}
+                className="btn-arrow"
+                title="Next page"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* See All Button - Only show if there are more items than displayed */}
+          {showSeeAll && (seeAllCount !== undefined ? displayCount > 0 : data.length > ITEMS_PER_PAGE) && (
+            <button
+              onClick={onSeeAll}
+              className="btn-ghost text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-4 py-2"
+            >
+              See all ({displayCount})
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
   };
 
   // Empty State Component
-  const EmptyState = ({ 
-    title = "No items available", 
+  const EmptyState = ({
+    title = "No items available",
     description = "Check back later for new content",
     IconComponent = Music2,
-    action 
+    action
   }) => (
     <div className="text-center py-16 px-6 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
       <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-xl flex items-center justify-center mx-auto mb-4">
@@ -213,19 +218,19 @@ const DisplayHome = () => {
               Search results for "{searchQuery}"
             </h1>
             <p className="text-gray-500 dark:text-gray-400">
-              {hasData.searchResults 
+              {hasData.searchResults
                 ? `Found ${searchResults.songs.length + searchResults.albums.length + searchResults.playlists.length} results`
                 : 'No results found'
               }
             </p>
           </div>
         </div>
-        
+
         {/* Songs Results - Only show if there are songs */}
         {searchResults.songs.length > 0 && (
           <section>
-            <SectionHeader 
-              title="Songs" 
+            <SectionHeader
+              title="Songs"
               data={searchResults.songs}
               showSeeAll={false}
             />
@@ -240,8 +245,8 @@ const DisplayHome = () => {
         {/* Albums Results - Only show if there are albums */}
         {searchResults.albums.length > 0 && (
           <section>
-            <SectionHeader 
-              title="Albums" 
+            <SectionHeader
+              title="Albums"
               data={searchResults.albums}
               showSeeAll={false}
             />
@@ -262,8 +267,8 @@ const DisplayHome = () => {
         {/* Playlists Results - Only show if there are playlists */}
         {searchResults.playlists.length > 0 && (
           <section>
-            <SectionHeader 
-              title="Playlists" 
+            <SectionHeader
+              title="Playlists"
               data={searchResults.playlists}
               showSeeAll={false}
             />
@@ -307,13 +312,13 @@ const DisplayHome = () => {
         <div className="relative z-10 max-w-3xl px-4 sm:px-6 lg:px-8">
           <h1 className="text-h1 text-white mb-4">Welcome to MusicFlow</h1>
           <p className="text-base sm:text-lg text-blue-100 dark:text-blue-200/90 mb-6 sm:mb-8">
-            {songsData.length > 0 
+            {songsData.length > 0
               ? `Discover ${songsData.length} songs across ${albumsData.length} albums`
               : 'Start adding music to your library'
             }
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
-            <button 
+            <button
               onClick={() => {
                 if (songsData.length > 0) {
                   playWithId(songsData[0]._id, songsData);
@@ -327,7 +332,7 @@ const DisplayHome = () => {
             >
               {songsData.length > 0 ? 'Start Listening' : 'No Songs Available'}
             </button>
-            <button 
+            <button
               onClick={() => navigate('/songs')}
               className="px-8 py-3 rounded-lg font-medium border-2 border-white/30 bg-white/10 text-white hover:bg-white/20 transition-all duration-200"
             >
@@ -399,13 +404,12 @@ const DisplayHome = () => {
         <SectionHeader title="Quick Access" showSeeAll={false} />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Liked Songs Card */}
-          <div 
-            className={`glass-card-premium relative overflow-hidden p-6 text-white cursor-pointer transition-all duration-200 ${
-              hasData.likedSongs
+          <div
+            className={`glass-card-premium relative overflow-hidden p-6 text-white cursor-pointer transition-all duration-200 ${hasData.likedSongs
                 ? 'hover:shadow-lg hover:-translate-y-0.5'
                 : 'opacity-60 cursor-not-allowed'
-            }`}
-            onClick={() => hasData.likedSongs 
+              }`}
+            onClick={() => hasData.likedSongs
               ? navigate('/liked')
               : showToast('No liked songs yet', 'info')
             }
@@ -421,13 +425,12 @@ const DisplayHome = () => {
           </div>
 
           {/* Playlists Card */}
-          <div 
-            className={`glass-card-premium relative overflow-hidden p-6 text-white cursor-pointer transition-all duration-200 ${
-              hasData.playlists
+          <div
+            className={`glass-card-premium relative overflow-hidden p-6 text-white cursor-pointer transition-all duration-200 ${hasData.playlists
                 ? 'hover:shadow-lg hover:-translate-y-0.5'
                 : 'opacity-60 cursor-not-allowed'
-            }`}
-            onClick={() => hasData.playlists 
+              }`}
+            onClick={() => hasData.playlists
               ? navigate('/playlists')
               : showToast('Create your first playlist', 'info')
             }
@@ -443,13 +446,12 @@ const DisplayHome = () => {
           </div>
 
           {/* Albums Card */}
-          <div 
-            className={`glass-card-premium relative overflow-hidden p-6 text-white cursor-pointer transition-all duration-200 ${
-              hasData.featuredCharts
+          <div
+            className={`glass-card-premium relative overflow-hidden p-6 text-white cursor-pointer transition-all duration-200 ${hasData.featuredCharts
                 ? 'hover:shadow-lg hover:-translate-y-0.5'
                 : 'opacity-60 cursor-not-allowed'
-            }`}
-            onClick={() => hasData.featuredCharts 
+              }`}
+            onClick={() => hasData.featuredCharts
               ? navigate('/albums')
               : showToast('No albums available', 'info')
             }
@@ -465,13 +467,12 @@ const DisplayHome = () => {
           </div>
 
           {/* All Songs Card */}
-          <div 
-            className={`glass-card-premium relative overflow-hidden p-6 text-white cursor-pointer transition-all duration-200 ${
-              hasData.biggestHits
+          <div
+            className={`glass-card-premium relative overflow-hidden p-6 text-white cursor-pointer transition-all duration-200 ${hasData.biggestHits
                 ? 'hover:shadow-lg hover:-translate-y-0.5'
                 : 'opacity-60 cursor-not-allowed'
-            }`}
-            onClick={() => hasData.biggestHits 
+              }`}
+            onClick={() => hasData.biggestHits
               ? navigate('/songs')
               : showToast('No songs available', 'info')
             }

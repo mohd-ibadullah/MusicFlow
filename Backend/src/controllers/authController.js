@@ -109,6 +109,13 @@ const loginUser = async (req, res) => {
       });
     }
 
+    if (typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid input format",
+      });
+    }
+
     // Find user and include password
     const user = await User.findOne({ email }).select("+password");
     if (!user) {

@@ -25,7 +25,8 @@ const Player = () => {
     handleVolumeChange,
     toggleLikeSong,
     isSongLiked,
-    activeListenersCount
+    activeListenersCount,
+    currentPlaylist
   } = usePlayer();
   
   const { isDark } = useTheme();
@@ -120,7 +121,12 @@ const Player = () => {
             {/* Previous Button */}
             <button 
               onClick={previous}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
+              disabled={!currentPlaylist || currentPlaylist.length <= 1}
+              className={`transition-colors duration-200 ${
+                !currentPlaylist || currentPlaylist.length <= 1
+                  ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              }`}
               title="Previous song"
             >
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
@@ -144,7 +150,12 @@ const Player = () => {
             {/* Next Button */}
             <button 
               onClick={next}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
+              disabled={!currentPlaylist || currentPlaylist.length <= 1}
+              className={`transition-colors duration-200 ${
+                !currentPlaylist || currentPlaylist.length <= 1
+                  ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              }`}
               title="Next song"
             >
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
@@ -271,18 +282,16 @@ const Player = () => {
               style={{ width: `${volume}%` }}
             />
           </div>
-        </div>
-
-        {/* Live listeners indicator - only shown when someone is listening */}
-        {activeListenersCount > 0 && (
-          <div className="flex items-center ml-2 sm:ml-4 shrink-0">
-            <span className="text-xs font-semibold text-orange-600 dark:text-orange-400 flex items-center gap-1">
-              <Flame className="w-4 h-4" />
-              {activeListenersCount}{" "}
-              {activeListenersCount === 1 ? "user" : "users"} listening right now
+          
+          {/* Live listeners indicator - securely anchored to the volume flex box */}
+          <div className="pl-2 sm:pl-4 border-l border-gray-200/50 dark:border-gray-700/50 hidden lg:flex items-center">
+            <span className="whitespace-nowrap text-sm opacity-70 min-w-[110px] flex justify-end text-right font-semibold text-orange-600 dark:text-orange-400 items-center gap-1.5">
+              <Flame className="w-4 h-4 shrink-0" />
+              {activeListenersCount} listening
             </span>
           </div>
-        )}
+        </div>
+
       </div>
     </div>
   );

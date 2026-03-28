@@ -20,6 +20,8 @@ if (!process.env.JWT_SECRET) {
 }
 
 import { Server } from "socket.io";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import songRouter from "./src/routes/songRouter.js";
 import connectDB from "./src/config/mongodb.js";
 import connectCloudinary from "./src/config/cloudinary.js";
@@ -46,8 +48,33 @@ connectCloudinary();
 connectRedis().catch((err) => console.warn("Redis init:", err.message));
 
 // Middlewares
+app.use(helmet()); // Secure HTTP headers
 app.use(express.json());
-app.use(cors());
+
+// Strict CORS domain matching
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',')
+  : ["http://localhost:5000", "http://localhost:5173", "http://localhost:5174"];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+// Apply rate limiting to all /api routes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // Limit each IP to 200 requests per 15 mins
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api', apiLimiter);
 
 // Health check endpoint
 app.get("/api/health", async (req, res) => {
@@ -98,7 +125,7 @@ for (const p of CANDIDATE_FRONTEND_PATHS) {
       resolvedFrontendPath = p;
       break;
     }
-  } catch {}
+  } catch { }
 }
 
 if (resolvedFrontendPath) {
@@ -139,28 +166,115 @@ app.use((req, res) => {
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: process.env.CORS_ORIGIN || "*" },
+  cors: {
+    origin: allowedOrigins,
+    credentials: true
+  },
   pingTimeout: 60000,
 });
 app.set("io", io);
 
-const activeSockets = new Set();
-app.set("activeSockets", activeSockets);
+const activeUsersMap = new Map();
+const socketToUserMap = new Map();
+
+// Optional: you can still set maps to app if needed elsewhere
+app.set("activeUsersMap", activeUsersMap);
+
+import { isRedisAvailable, getRedisClient } from "./src/config/redis.js";
+import { cacheGetLiveEvents } from "./src/services/cacheService.js";
+
+// Clean up stale listener keys on fresh boot if Redis is available
+setTimeout(async () => {
+  if (isRedisAvailable()) {
+    try {
+      const client = getRedisClient();
+      const keys = await client.keys('user_sockets:*');
+      if (keys.length > 0) await client.del(keys);
+      await client.del('active_users');
+      console.log("🧹 Cleared stale socket sessions from Redis");
+    } catch (e) {
+      console.warn("Failed to clean Redis socket keys:", e.message);
+    }
+  }
+}, 3000);
+
+const broadcastListenerCount = async () => {
+  let count = activeUsersMap.size;
+  if (isRedisAvailable()) {
+    try {
+      const client = getRedisClient();
+      count = await client.sCard("active_users");
+    } catch {}
+  }
+  io.emit("users_listening", count);
+};
 
 io.on("connection", (socket) => {
-  socket.on("user_started_listening", () => {
-    activeSockets.add(socket.id);
-    io.emit("users_listening", activeSockets.size);
+  socket.on("user_started_listening", async (data) => {
+    // Rely on provided userId, fallback to socket id for anon sessions
+    const userId = data?.userId || socket.id;
+    socketToUserMap.set(socket.id, userId);
+
+    if (isRedisAvailable()) {
+      try {
+        const client = getRedisClient();
+        await client.sAdd(`user_sockets:${userId}`, socket.id);
+        await client.sAdd("active_users", userId);
+      } catch (err) {
+        console.warn("Redis socket error:", err.message);
+      }
+    } else {
+      if (!activeUsersMap.has(userId)) {
+        activeUsersMap.set(userId, new Set());
+      }
+      activeUsersMap.get(userId).add(socket.id);
+    }
+
+    broadcastListenerCount();
   });
 
-  socket.on("user_stopped_listening", () => {
-    activeSockets.delete(socket.id);
-    io.emit("users_listening", activeSockets.size);
-  });
+  const handleDisconnect = async () => {
+    const userId = socketToUserMap.get(socket.id);
+    if (!userId) return;
 
-  socket.on("disconnect", () => {
-    activeSockets.delete(socket.id);
-    io.emit("users_listening", activeSockets.size);
+    if (isRedisAvailable()) {
+      try {
+        const client = getRedisClient();
+        await client.sRem(`user_sockets:${userId}`, socket.id);
+        const socketCount = await client.sCard(`user_sockets:${userId}`);
+        if (socketCount === 0) {
+          await client.sRem("active_users", userId);
+          await client.del(`user_sockets:${userId}`);
+        }
+      } catch (err) {
+        console.warn("Redis disconnect error:", err.message);
+      }
+    } else {
+      if (activeUsersMap.has(userId)) {
+        const userSockets = activeUsersMap.get(userId);
+        userSockets.delete(socket.id);
+        if (userSockets.size === 0) {
+          activeUsersMap.delete(userId);
+        }
+      }
+    }
+    
+    socketToUserMap.delete(socket.id);
+    broadcastListenerCount();
+  };
+
+  socket.on("user_stopped_listening", handleDisconnect);
+  socket.on("disconnect", handleDisconnect);
+
+  // Handle request for current listener count
+  socket.on("get_listeners", async () => {
+    broadcastListenerCount();
+    
+    // Also push historical cache of live listening
+    const recentEvents = await cacheGetLiveEvents();
+    if (recentEvents && recentEvents.length > 0) {
+      socket.emit("recent_live_events", recentEvents);
+    }
   });
 });
 

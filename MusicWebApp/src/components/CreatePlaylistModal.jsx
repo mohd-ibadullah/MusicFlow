@@ -1,11 +1,12 @@
 // components/CreatePlaylistModal.jsx
 import React, { useState } from "react";
 import { usePlayer } from "../context/PlayerContext";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme, useToast } from "../context/ThemeContext";
 
 const CreatePlaylistModal = () => {
   const { showPlaylistModal, setShowPlaylistModal, createPlaylist } = usePlayer();
   const { isDark } = useTheme();
+  const { showToast } = useToast();
   const [playlistName, setPlaylistName] = useState("");
   const [loading, setLoading] = useState(false);
   const [isAIGeneration, setIsAIGeneration] = useState(false);
@@ -31,28 +32,26 @@ const CreatePlaylistModal = () => {
         setLoading(false);
         
         if (result.success) {
+          showToast(`Generated playlist "${result.playlist.name}"`, "success");
           setAiPrompt("");
           setShowPlaylistModal(false);
           // Optionally navigate to the new playlist
           window.location.href = `/playlist/${result.playlist._id}`;
         } else {
-          alert(result.message || 'Failed to generate playlist');
+          showToast(result.message || 'Failed to generate playlist', 'error');
         }
       } catch (error) {
         setLoading(false);
-        alert('Error generating playlist');
+        showToast('Error generating playlist', 'error');
       }
     } else {
       if (!playlistName.trim()) return;
       
-      setLoading(true);
-      const result = await createPlaylist(playlistName.trim());
-      setLoading(false);
+      const nameToCreate = playlistName.trim();
+      setPlaylistName("");
+      setShowPlaylistModal(false); // Eagerly close modal for immediate UX response
       
-      if (result.success) {
-        setPlaylistName("");
-        setShowPlaylistModal(false);
-      }
+      await createPlaylist(nameToCreate);
     }
   };
 

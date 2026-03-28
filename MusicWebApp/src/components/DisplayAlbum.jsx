@@ -108,10 +108,10 @@ const DisplayAlbum = ({ album }) => {
           src={safeAlbumData.image} 
           alt={safeAlbumData.name} 
         />
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-col flex-1 min-w-0 w-full">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">ALBUM</p>
-          <h2 className="text-5xl font-bold mb-4 md:text-7xl text-gray-900 dark:text-gray-100">
-            {safeAlbumData.name}
+          <h2 className="text-5xl font-bold mb-4 md:text-7xl text-gray-900 dark:text-gray-100 whitespace-nowrap overflow-hidden text-ellipsis w-full">
+            {safeAlbumData?.name || ""}
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-4">{safeAlbumData.desc}</p>
           <div className="flex items-center space-x-6">
@@ -132,13 +132,17 @@ const DisplayAlbum = ({ album }) => {
             <button
               onClick={handlePlayAlbum}
               disabled={albumSongs.length === 0}
-              className={albumSongs.length > 0 ? 'btn-primary px-8' : 'btn-primary opacity-50 cursor-not-allowed px-8'}
+              className={`h-10 px-6 flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 shadow-md ${
+                albumSongs.length > 0 
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                  : 'bg-gray-400 dark:bg-gray-600 text-gray-200 opacity-50 cursor-not-allowed'
+              }`}
             >
               {albumSongs.length > 0 ? 'Play Album' : 'No Songs'}
             </button>
             <button
               onClick={() => showToast("Feature coming soon!", "info")}
-              className="btn-secondary"
+              className="h-10 px-6 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm"
             >
               Save to Library
             </button>

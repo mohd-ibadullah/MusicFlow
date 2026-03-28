@@ -1,5 +1,5 @@
-// components/AddToPlaylistDropdown.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Music2 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { useToast } from '../context/ThemeContext';
@@ -56,7 +56,7 @@ const AddToPlaylistDropdown = ({ songId, isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
@@ -144,7 +144,8 @@ const AddToPlaylistDropdown = ({ songId, isOpen, onClose }) => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

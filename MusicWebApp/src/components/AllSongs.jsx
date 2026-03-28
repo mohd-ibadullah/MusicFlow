@@ -8,72 +8,114 @@ import SkeletonLoader from "./SkeletonLoader";
 import { usePlayer } from "../context/PlayerContext";
 import { useToast } from "../context/ThemeContext";
 
+import CustomDropdown from "./CustomDropdown";
+
 const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 const AllSongs = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { playWithId } = usePlayer();
+  const { playWithId, songsData } = usePlayer(); // <-- The Single Source of Truth
 
-  const [songs, setSongs] = useState([]);
-  const [artistOptions, setArtistOptions] = useState(["all"]);
+  const [artistOptions, setArtistOptions] = useState([{value: "all", label: "All artists"}]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
   const [languageFilter, setLanguageFilter] = useState("all");
   const [artistFilter, setArtistFilter] = useState("all");
   const [durationFilter, setDurationFilter] = useState("all");
   const [popularityFilter, setPopularityFilter] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
 
-  const languageOptions = ["all", "Hindi", "English", "Telugu"];
+  const languageOptions = [
+    { value: "all", label: "All languages" },
+    { value: "Hindi", label: "Hindi" },
+    { value: "English", label: "English" },
+    { value: "Telugu", label: "Telugu" }
+  ];
 
-  useEffect(() => {
-    axios.get(`${API_URL}/api/song/artists`).then((res) => {
-      if (res.data?.success && Array.isArray(res.data.artists)) {
-        setArtistOptions(["all", ...res.data.artists.filter((a) => a && a !== "Unknown Artist")]);
-      }
-    }).catch(() => {});
-  }, []);
+  const durationOptions = [
+    { value: "all", label: "All lengths" },
+    { value: "short", label: "Short (<3m)" },
+    { value: "medium", label: "Medium (3–5m)" },
+    { value: "long", label: "Long (>5m)" }
+  ];
 
-  const fetchSongs = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.set("language", languageFilter);
-      params.set("artist", artistFilter);
-      params.set("duration", durationFilter);
-      params.set("popularity", popularityFilter);
-      params.set("sort", sortBy);
+  const popularityOptions = [
+    { value: "all", label: "All popularity" },
+    { value: "high", label: "Popular" },
+    { value: "low", label: "Less popular" }
+  ];
 
-      const url = `${API_URL}/api/song/list?${params.toString()}`;
-      const res = await axios.get(url);
-      const data = res.data?.data ?? res.data ?? [];
-      setSongs(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Failed to fetch songs:", err);
-      setSongs([]);
-      showToast("Failed to load songs", "error");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [languageFilter, artistFilter, durationFilter, popularityFilter, sortBy, showToast]);
+  const sortOptions = [
+    { value: "newest", label: "Newest first" },
+    { value: "oldest", label: "Oldest first" },
+    { value: "name", label: "Name A–Z" },
+    { value: "album", label: "Album A–Z" },
+    { value: "popular", label: "Most popular" }
+  ];
 
   useEffect(() => {
-    fetchSongs();
-  }, [fetchSongs]);
+    // Dynamically build artist combinations from songsData so we never rely on separate network delays
+    const uniqueArtists = new Set(songsData.map(s => s.artist).filter(a => a && a !== "Unknown Artist"));
+    setArtistOptions([
+      { value: "all", label: "All artists" },
+      ...Array.from(uniqueArtists).sort().map(a => ({ value: a, label: a }))
+    ]);
+  }, [songsData]);
 
   const filteredSongs = useMemo(() => {
-    if (!searchQuery.trim()) return songs;
-    const q = searchQuery.toLowerCase().trim();
-    return songs.filter(
-      (s) =>
-        s.name?.toLowerCase().includes(q) ||
-        s.artist?.toLowerCase().includes(q) ||
-        s.language?.toLowerCase().includes(q) ||
-        s.album?.toLowerCase().includes(q) ||
-        s.desc?.toLowerCase().includes(q)
-    );
-  }, [songs, searchQuery]);
+    let result = [...songsData];
+
+    // 1. Text Search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(s =>
+        (s.name || "").toLowerCase().includes(q) ||
+        (s.artist || "").toLowerCase().includes(q) ||
+        (s.language || "").toLowerCase().includes(q) ||
+        (s.album || "").toLowerCase().includes(q) ||
+        (s.desc || "").toLowerCase().includes(q)
+      );
+    }
+
+    // 2. Exact Match Filters
+    if (languageFilter !== "all") {
+      result = result.filter(s => s.language === languageFilter);
+    }
+    if (artistFilter !== "all") {
+      result = result.filter(s => s.artist === artistFilter);
+    }
+
+    // 3. Mathematical Filters
+    if (popularityFilter === "high") {
+      result = result.filter(s => (s.playCount || 0) >= 10);
+    } else if (popularityFilter === "low") {
+      result = result.filter(s => (s.playCount || 0) < 10);
+    }
+
+    if (durationFilter !== "all") {
+      result = result.filter(s => {
+        if (!s.duration) return false;
+        const parts = s.duration.split(":");
+        const minutes = parseInt(parts[0] || '0', 10);
+        if (durationFilter === "short") return minutes < 3;
+        if (durationFilter === "medium") return minutes >= 3 && minutes < 6;
+        if (durationFilter === "long") return minutes >= 6;
+        return true;
+      });
+    }
+
+    // 4. Sort Strategies
+    result.sort((a, b) => {
+      if (sortBy === "oldest") return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+      if (sortBy === "newest") return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      if (sortBy === "name") return (a.name || "").localeCompare(b.name || "");
+      if (sortBy === "album") return (a.album || "").localeCompare(b.album || "");
+      if (sortBy === "popular") return (b.playCount || 0) - (a.playCount || 0);
+      return 0;
+    });
+
+    return result;
+  }, [songsData, searchQuery, languageFilter, artistFilter, popularityFilter, durationFilter, sortBy]);
 
   const handleBack = () => navigate(-1);
 
@@ -85,9 +127,6 @@ const AllSongs = () => {
       showToast("No songs to play", "info");
     }
   };
-
-  const selectClass =
-    "appearance-none px-4 py-2.5 pr-10 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 min-w-0 w-full shadow-sm";
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -131,50 +170,40 @@ const AllSongs = () => {
         </div>
 
         <div className="flex flex-wrap gap-3 items-center">
-          <div className="min-w-[140px] max-w-[180px]">
-            <select value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)} className={selectClass}>
-              <option value="all">All languages</option>
-              {languageOptions.slice(1).map((lang) => (
-                <option key={lang} value={lang}>{lang}</option>
-              ))}
-            </select>
-          </div>
-          <div className="min-w-[140px] max-w-[180px]">
-            <select value={artistFilter} onChange={(e) => setArtistFilter(e.target.value)} className={selectClass}>
-              <option value="all">All artists</option>
-              {artistOptions.slice(1).map((a) => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-            </select>
-          </div>
-          <div className="min-w-[140px] max-w-[180px]">
-            <select value={durationFilter} onChange={(e) => setDurationFilter(e.target.value)} className={selectClass}>
-              <option value="all">All lengths</option>
-              <option value="short">Short (&lt;3m)</option>
-              <option value="medium">Medium (3–5m)</option>
-              <option value="long">Long (&gt;5m)</option>
-            </select>
-          </div>
-            <div className="min-w-[140px] max-w-[180px]">
-            <select value={popularityFilter} onChange={(e) => setPopularityFilter(e.target.value)} className={selectClass}>
-              <option value="all">All popularity</option>
-              <option value="high">Popular</option>
-              <option value="low">Less popular</option>
-            </select>
-          </div>
-          <div className="min-w-[140px] max-w-[180px]">
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={selectClass}>
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="name">Name A–Z</option>
-              <option value="album">Album A–Z</option>
-              <option value="popular">Most popular</option>
-            </select>
-          </div>
+          <CustomDropdown 
+            options={languageOptions} 
+            value={languageFilter} 
+            onChange={setLanguageFilter} 
+            className="flex-1"
+          />
+          <CustomDropdown 
+            options={artistOptions} 
+            value={artistFilter} 
+            onChange={setArtistFilter} 
+            className="flex-1"
+          />
+          <CustomDropdown 
+            options={durationOptions} 
+            value={durationFilter} 
+            onChange={setDurationFilter} 
+            className="flex-1"
+          />
+          <CustomDropdown 
+            options={popularityOptions} 
+            value={popularityFilter} 
+            onChange={setPopularityFilter} 
+            className="flex-1"
+          />
+          <CustomDropdown 
+            options={sortOptions} 
+            value={sortBy} 
+            onChange={setSortBy} 
+            className="flex-1"
+          />
         </div>
       </div>
 
-      {isLoading ? (
+      {!songsData.length ? (
         <SkeletonLoader type="card" count={12} className="songs-grid" />
       ) : filteredSongs.length > 0 ? (
         <div className="songs-grid">

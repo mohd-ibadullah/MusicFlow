@@ -3,18 +3,15 @@ import React, { useState, useMemo } from "react";
 import { Music2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PlaylistItem from "./playlistItem";
-import SkeletonLoader from "./SkeletonLoader";
 import { usePlayer } from "../context/PlayerContext";
 import { useToast } from "../context/ThemeContext";
 
 const DisplayPlaylists = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { playlists, createPlaylist, deletePlaylist } = usePlayer();
+  const { playlists, deletePlaylist, setShowPlaylistModal } = usePlayer();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newPlaylistName, setNewPlaylistName] = useState("");
+  const [playlistToDelete, setPlaylistToDelete] = useState(null);
 
   // Filter playlists based on search query
   const filteredPlaylists = useMemo(() => {
@@ -32,29 +29,16 @@ const DisplayPlaylists = () => {
     navigate(-1);
   };
 
-  const handleCreatePlaylist = async () => {
-    if (!newPlaylistName.trim()) {
-      showToast("Please enter a playlist name", "error");
-      return;
-    }
 
-    setIsLoading(true);
-    const result = await createPlaylist(newPlaylistName.trim());
-    setIsLoading(false);
 
+  const handleConfirmDelete = async () => {
+    if (!playlistToDelete) return;
+    
+    const result = await deletePlaylist(playlistToDelete._id);
     if (result.success) {
-      setNewPlaylistName("");
-      setShowCreateModal(false);
+      showToast("Playlist deleted successfully", "success");
     }
-  };
-
-  const handleDeletePlaylist = async (playlistId) => {
-    if (window.confirm("Are you sure you want to delete this playlist?")) {
-      const result = await deletePlaylist(playlistId);
-      if (result.success) {
-        showToast("Playlist deleted successfully", "success");
-      }
-    }
+    setPlaylistToDelete(null);
   };
 
   return (
@@ -80,7 +64,7 @@ const DisplayPlaylists = () => {
         </div>
 
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => setShowPlaylistModal(true)}
           className="btn-primary flex items-center space-x-2"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,13 +89,7 @@ const DisplayPlaylists = () => {
       </div>
 
       {/* Playlists Grid */}
-      {isLoading ? (
-        <SkeletonLoader 
-          type="card" 
-          count={12} 
-          className="songs-grid" 
-        />
-      ) : filteredPlaylists.length > 0 ? (
+      {filteredPlaylists.length > 0 ? (
         <div className="songs-grid">
           {filteredPlaylists.map((playlist, index) => (
             <div key={playlist._id || index} className="animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
@@ -125,8 +103,12 @@ const DisplayPlaylists = () => {
                 
                 {/* Delete Button - Only show on hover */}
                 <button
-                  onClick={() => handleDeletePlaylist(playlist._id)}
-                  className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-md"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setPlaylistToDelete({ _id: playlist._id, name: playlist.name });
+                  }}
+                  className="absolute z-10 top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-md"
                   title="Delete playlist"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,7 +135,7 @@ const DisplayPlaylists = () => {
           </p>
           {!searchQuery && (
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => setShowPlaylistModal(true)}
               className="btn-primary px-8"
             >
               Create Your First Playlist
@@ -162,63 +144,33 @@ const DisplayPlaylists = () => {
         </div>
       )}
 
-      {/* Create Playlist Modal */}
-      {showCreateModal && (
+      {/* Delete Confirmation Modal */}
+      {playlistToDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 w-full max-w-md shadow-xl border border-gray-200 dark:border-gray-700 animate-slide-up">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create Playlist</h2>
+          <div className="bg-white dark:bg-[#242b3b] rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-gray-700/50">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Delete Playlist</h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm">
+              Are you sure you want to delete "<span className="font-bold text-gray-900 dark:text-white">{playlistToDelete.name}</span>"? 
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-center sm:justify-end">
               <button
-                onClick={() => setShowCreateModal(false)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-300"
-              >
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Playlist Name
-              </label>
-              <input
-                type="text"
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                placeholder="My Awesome Playlist"
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
-                onKeyPress={(e) => e.key === 'Enter' && handleCreatePlaylist()}
-                autoFocus
-              />
-            </div>
-
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="btn-secondary rounded-xl"
-                disabled={isLoading}
+                onClick={() => setPlaylistToDelete(null)}
+                className="px-6 py-2.5 rounded-lg font-medium text-sm border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleCreatePlaylist}
-                disabled={!newPlaylistName.trim() || isLoading}
-                className="btn-primary rounded-xl shrink-0"
+                onClick={handleConfirmDelete}
+                className="px-6 py-2.5 bg-red-500 text-white rounded-lg font-medium text-sm hover:bg-red-600 transition-colors duration-200"
               >
-                {isLoading ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Creating...</span>
-                  </div>
-                ) : (
-                  'Create Playlist'
-                )}
+                Delete Playlist
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };

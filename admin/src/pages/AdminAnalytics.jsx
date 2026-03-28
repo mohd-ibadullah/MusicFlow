@@ -5,11 +5,11 @@ import { url } from "../App";
 import { toast } from "react-toastify";
 
 const TYPE_META = {
-  song_played:      { icon: "🎵", label: "Played" },
-  song_added:       { icon: "➕", label: "Added" },
-  song_liked:       { icon: "❤️", label: "Liked" },
+  song_played: { icon: "🎵", label: "Played" },
+  song_added: { icon: "➕", label: "Added" },
+  song_liked: { icon: "❤️", label: "Liked" },
   playlist_created: { icon: "🎶", label: "Playlist" },
-  album_added:      { icon: "💿", label: "Album" },
+  album_added: { icon: "💿", label: "Album" },
 };
 
 const timeAgo = (dateStr) => {
@@ -30,10 +30,36 @@ const AdminAnalytics = () => {
   const [activityLoading, setActivityLoading] = useState(true);
   const [liveListeners, setLiveListeners] = useState(0);
   const socketRef = useRef(null);
+  const socketConnectedRef = useRef(false);
 
   const authHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
   });
+
+  // Helper function to generate unique key for activity deduplication
+  const getActivityUniqueKey = (activity) => {
+    // Extract songId from activity (might be in songId field or embedded in message)
+    let songId = activity.songId || null;
+
+    // Try to extract song identifier from message if not directly available
+    if (!songId && activity.message) {
+      // Common message patterns in the backend:
+      // - "Song Name" was played
+      // - "Song Name" was liked
+      // - "Song Name" by Artist was played
+      // - User is listening to "Song Name"
+      const match = activity.message.match(/"([^"]+)"/);
+      if (match) {
+        // Use the song name as a proxy for songId when actual ID is not available
+        // This helps deduplicate even when backend doesn't send songId
+        songId = match[1].toLowerCase().replace(/\s+/g, '_');
+      }
+    }
+
+    const timestamp = new Date(activity.createdAt);
+    const minuteTimestamp = Math.floor(timestamp.getTime() / 60000); // Round to minute
+    return `${activity.type}|${activity.userId}|${songId}|${minuteTimestamp}`;
+  };
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -56,13 +82,32 @@ const AdminAnalytics = () => {
     }
   }, []);
 
-  const fetchActivity = useCallback(async () => {
+  const fetchActivity = useCallback(async (merge = true) => {
     try {
       const response = await axios.get(`${url}/api/admin/recent-activity`, {
         headers: authHeaders(),
       });
       if (response.data.success) {
-        setActivity(response.data.data);
+        if (merge) {
+          // Because the backend now perfectly records 'song_played' and emits 'activity_created' uniformly,
+          // we do not need the wild string-matching deduction logic. Just prepend the fresh socket array
+          // and deduplicate exactly by Database ID on top of the backend fresh fetch.
+          setActivity(prev => {
+            const backendActivities = response.data.data;
+            const merged = [...backendActivities, ...prev];
+            
+            // Standard deterministic Deduplication by _id 
+            const uniqueMap = new Map();
+            merged.forEach(item => { if (item && item._id) uniqueMap.set(item._id.toString(), item); });
+            const unique = Array.from(uniqueMap.values());
+            
+            const limited = unique.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 20);
+            return limited;
+          });
+        } else {
+          // Full replace (used on initial load)
+          setActivity(response.data.data);
+        }
         setActivityLoading(false);
       }
     } catch (error) {
@@ -71,46 +116,201 @@ const AdminAnalytics = () => {
     }
   }, []);
 
+  // Add new activity to the list (for real-time updates directly sourced from database hooks)
+  const addActivity = useCallback((newActivity) => {
+    setActivity(prev => {
+      const activityObj = {
+        _id: newActivity._id,
+        type: newActivity.type || "song_played",
+        message: newActivity.message || "New activity",
+        createdAt: newActivity.createdAt || new Date().toISOString(),
+        userId: newActivity.userId || null,
+        songId: newActivity.songId || null
+      };
+
+      // Filter out duplicates by exact database ID and insert new activity at beginning
+      const filteredPrev = prev.filter(item => item._id?.toString() !== activityObj._id?.toString());
+      return [activityObj, ...filteredPrev].slice(0, 20);
+    });
+  }, []);
+
+  // Update top songs when song is played or liked
+  const updateTopSongs = useCallback((payload = null) => {
+    if (!payload?.songId) return;
+
+    setAnalytics(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev };
+
+      // Update total streams count if it was a song_played event
+      if (payload.type === "song_played" && typeof updated.totalStreams === 'number') {
+        updated.totalStreams += 1;
+      }
+
+      // Update top songs
+      if (updated.topSongs) {
+        updated.topSongs = [...updated.topSongs];
+        const songIndex = updated.topSongs.findIndex(song =>
+          song._id === payload.songId || song._id?.toString() === payload.songId
+        );
+
+        if (songIndex !== -1) {
+          if (payload.type === "song_played") {
+            updated.topSongs[songIndex] = {
+              ...updated.topSongs[songIndex],
+              playCount: (updated.topSongs[songIndex].playCount || 0) + 1
+            };
+            // Re-sort top songs by playCount (descending)
+            updated.topSongs.sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
+          } else if (payload.type === "song_liked" && payload.likeCount !== undefined) {
+             updated.topSongs[songIndex] = {
+               ...updated.topSongs[songIndex],
+               likeCount: payload.likeCount
+             };
+          } else if (payload.type === "song_unliked" && payload.likeCount !== undefined) {
+             updated.topSongs[songIndex] = {
+               ...updated.topSongs[songIndex],
+               likeCount: payload.likeCount
+             };
+          }
+        }
+      }
+
+      // Update top artists if it's a song_played event
+      if (payload.type === "song_played" && payload.artist && updated.topArtists) {
+        updated.topArtists = [...updated.topArtists];
+        const artistIndex = updated.topArtists.findIndex(artist =>
+          artist.name === payload.artist || artist._id === payload.artist
+        );
+
+        if (artistIndex !== -1) {
+          updated.topArtists[artistIndex] = {
+            ...updated.topArtists[artistIndex],
+            totalPlays: (updated.topArtists[artistIndex].totalPlays || 0) + 1
+          };
+          updated.topArtists.sort((a, b) => (b.totalPlays || 0) - (a.totalPlays || 0));
+        }
+      }
+
+      return updated;
+    });
+  }, []);
+
   useEffect(() => {
+    // Initial fetch ONLY
     fetchAnalytics();
-    fetchActivity();
-
-    // Auto-refresh activity every 10 seconds to pick up song plays and other events
-    const activityInterval = setInterval(fetchActivity, 10000);
-
-    return () => clearInterval(activityInterval);
+    fetchActivity(false); // Don't merge on initial load
+    // Removed all periodic pollings and setTimeouts exactly as requested
   }, [fetchAnalytics, fetchActivity]);
 
-  // Real-time socket connection for live listener count
+  // Real-time socket connection for live listener count and activity updates
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    let reconnectTimeout = null;
+
+    const connectSocket = async () => {
       try {
         const { io } = await import("socket.io-client");
         const socket = io({ path: "/socket.io", transports: ["polling", "websocket"] });
-        if (!mounted) { socket.disconnect(); return; }
+
+        if (!mounted) {
+          socket.disconnect();
+          return;
+        }
+
         socketRef.current = socket;
+        socketConnectedRef.current = false;
+
+        socket.on("connect", () => {
+          socketConnectedRef.current = true;
+          console.log("[Admin Analytics] Socket connected");
+
+          // Request current listener count from server ONLY. 
+          // Removed duplicate fetchAnalytics/fetchActivity calls on reconnect.
+          socket.emit("get_listeners");
+        });
+
+        socket.on("disconnect", () => {
+          socketConnectedRef.current = false;
+          console.log("[Admin Analytics] Socket disconnected");
+        });
+
+        socket.on("connect_error", (err) => {
+          console.warn("[Admin Analytics] Socket connection error:", err.message);
+          socketConnectedRef.current = false;
+
+          // Attempt reconnection after delay
+          if (mounted) {
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = setTimeout(() => {
+              if (socketRef.current && !socketRef.current.connected) {
+                console.log("[Admin Analytics] Attempting to reconnect socket...");
+                socketRef.current.connect();
+              }
+            }, 3000);
+          }
+        });
 
         socket.on("users_listening", (count) => {
           if (!mounted) return;
           setLiveListeners(typeof count === "number" ? Math.max(0, count) : 0);
         });
+
+        // Listen for individual user listening events
+        socket.on("user_listening", (payload) => {
+          if (!mounted) return;
+          console.log("[Admin Analytics] Received user_listening:", payload);
+
+          // Explicitly restore activity feed generation for "song played" actions purely optimistically
+          addActivity({
+            type: "song_played",
+            message: `${payload.userName || "User"} is listening to "${payload.songName || "a song"}"`,
+            userId: payload.userId,
+            songId: payload.songId || null
+          });
+        });
+
+        // Listen for new activity events (if backend emits them)
+        socket.on("activity_created", (newActivity) => {
+          if (!mounted) return;
+          console.log("[Admin Analytics] New activity:", newActivity);
+          addActivity(newActivity);
+        });
+
+        // Listen for analytics updates (when song play counts change)
+        socket.on("analytics_updated", (payload) => {
+          if (!mounted) return;
+          console.log("[Admin Analytics] Analytics updated:", payload);
+
+          // Immediately update top songs/artists when analytics change
+          updateTopSongs(payload);
+        });
+
       } catch (err) {
-        console.warn("[Admin] Socket not available:", err.message);
+        console.warn("[Admin Analytics] Socket not available:", err.message);
       }
-    })();
+    };
+
+    connectSocket();
+
+    // Fallback fully removed to prevent background fetching loop. API load strictly via initial mount.
+
     return () => {
       mounted = false;
+      clearTimeout(reconnectTimeout);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
+        socketConnectedRef.current = false;
       }
     };
-  }, []);
+  }, [fetchAnalytics, fetchActivity, addActivity]);
 
   const handleRefresh = () => {
+    console.log("[Admin Analytics] Manual refresh triggered");
     fetchAnalytics();
-    fetchActivity();
+    // Use merge mode for activity refresh to preserve socket activities
+    fetchActivity(true);
   };
 
   if (loading) {
@@ -277,10 +477,17 @@ const AdminAnalytics = () => {
           </div>
         ) : activity.length > 0 ? (
           <div className="space-y-3">
-            {activity.map((item) => {
+            {activity
+              .filter((item, index, self) => 
+                index === self.findIndex((t) => t.message === item.message)
+              )
+              .slice(0, 20)
+              .map((item, index) => {
               const meta = TYPE_META[item.type] || { icon: "📌", label: "" };
+              // Create a stable key using _id if available, otherwise use a combination of content and timestamp
+              const stableKey = item._id || `${item.type}_${item.message}_${item.createdAt}_${index}`;
               return (
-                <div key={item._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div key={stableKey} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <span className="text-lg">{meta.icon}</span>
                     <p className="text-sm text-gray-700">{item.message}</p>
