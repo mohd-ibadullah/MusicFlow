@@ -100,8 +100,17 @@ const AddAlbum = () => {
           <div className="space-y-2">
             <label className="text-label">Album Cover *</label>
             <input onChange={handleImageChange} type="file" id="image" accept="image/jpeg,image/png,image/jpg,image/gif,image/webp" hidden />
-            <label htmlFor="image">
-              <img src={image ? URL.createObjectURL(image) : assets.upload_area} className="upload-zone" alt="Cover" />
+            <label htmlFor="image" className="block transform transition-transform duration-200 active:scale-[0.98] hover:scale-[1.01]">
+              {image ? (
+                <img src={URL.createObjectURL(image)} className="upload-zone shadow-md ring-2 ring-blue-50/50" alt="Cover" />
+              ) : (
+                <div className="upload-zone flex flex-col items-center justify-center gap-2.5 bg-gray-50/40 border-gray-200/60 shadow-inner">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-gray-400">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                  </svg>
+                  <span className="text-xs font-semibold text-gray-500 tracking-tight">Set Cover</span>
+                </div>
+              )}
             </label>
             {image && (
               <p className="text-xs text-emerald-600 flex items-center gap-1">
@@ -124,10 +133,10 @@ const AddAlbum = () => {
             </div>
             <div>
               <label className="text-label">Background Color</label>
-              <div className="flex items-center gap-3">
-                <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-10 h-10 cursor-pointer rounded-lg border border-gray-200 p-0.5" />
-                <span className="text-xs text-gray-500 font-mono">{color}</span>
-                <div className="w-16 h-8 rounded-md border border-gray-200" style={{ backgroundColor: color }}></div>
+              <div className="flex items-center gap-3 bg-gray-50/30 p-2 rounded-xl border border-gray-100 w-fit">
+                <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-9 h-9 cursor-pointer rounded-lg border border-gray-200 overflow-hidden" />
+                <span className="text-[13px] text-gray-600 font-mono font-medium lowercase">{color}</span>
+                <div className="w-12 h-6 rounded-md shadow-sm border border-white" style={{ backgroundColor: color }}></div>
               </div>
             </div>
           </div>

@@ -1,12 +1,27 @@
 import Song from "../models/songModel.js";
 import Album from "../models/albumModel.js";
 import Activity from "../models/activityModel.js";
+import { isRedisAvailable, getRedisClient } from "../config/redis.js";
 
 export const getAnalytics = async (req, res) => {
   try {
-    const activeSockets = req.app.get("activeSockets");
-    const activeUsers = activeSockets ? activeSockets.size : 0;
-
+    // Get active user count (Redis-aware for distributed scaling, fallback to local map)
+    let activeUsers = 0;
+    if (isRedisAvailable()) {
+      try {
+        const client = getRedisClient();
+        activeUsers = await client.sCard("active_users");
+      } catch (redisError) {
+        console.warn("Redis error in analytics:", redisError.message);
+        const map = req.app.get("activeUsersMap");
+        activeUsers = map ? map.size : 0;
+      }
+    } else {
+      const map = req.app.get("activeUsersMap");
+      activeUsers = map ? map.size : 0;
+    }
+    
+    // Total stats and aggregations
     const [totalSongs, totalAlbums, streamAgg, topSongs, topArtistsAgg] = await Promise.all([
       Song.countDocuments(),
       Album.countDocuments(),

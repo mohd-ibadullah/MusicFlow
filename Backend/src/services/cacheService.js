@@ -7,7 +7,20 @@ export const CACHE_KEYS = {
   ALBUMS_LIST: "albums:list",
   TRENDING: (limit) => `songs:trending:${limit}`,
   RECOMMENDATIONS: (userId) => `songs:recommendations:${userId || "anon"}`,
-  RECENT_LIVE_EVENTS: "recent_live_events"
+  RECENT_LIVE_EVENTS: "recent_live_events",
+  SONG_DETAIL: (id) => `song:detail:${id}`
+};
+
+/**
+ * Invalidate specifically structural song caches (lists, trending) 
+ * called only on add/remove/update, not on every play/like.
+ */
+export const invalidateSongStructuralCaches = async () => {
+  console.log(`[CACHE] Invalidating structural song lists...`);
+  const client = getRedisClient();
+  if (!isRedisAvailable()) return;
+  const keys = await client.keys("songs:*");
+  if (keys.length > 0) await client.del(keys);
 };
 
 /**

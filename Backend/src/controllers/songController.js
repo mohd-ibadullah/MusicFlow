@@ -3,7 +3,7 @@ import Song from "../models/songModel.js";
 import User from "../models/userModel.js";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
-import { cacheGet, cacheSet, CACHE_KEYS, clearSongCaches, cachePushLiveEvent } from "../services/cacheService.js";
+import { cacheGet, cacheSet, CACHE_KEYS, invalidateSongStructuralCaches, cachePushLiveEvent } from "../services/cacheService.js";
 import * as songService from "../services/songService.js";
 import logActivity from "../utils/logActivity.js";
 
@@ -162,8 +162,8 @@ export const addSong = async (req, res) => {
     const song = new Song(songData);
     await song.save();
     
-    // Invalidate full song cache space and immediately rebuild it globally
-    await clearSongCaches();
+    // Structural change: Invalidate master lists and trending caches
+    await invalidateSongStructuralCaches();
     rebuildSongCaches();
     logActivity({
       type: "song_added",
@@ -290,8 +290,8 @@ export const removeSong = async (req, res) => {
       });
     }
     
-    // Invalidate everything to drop old references and immediately rebuild globally
-    await clearSongCaches();
+    // Structural change: Invalidate master lists and trending caches
+    await invalidateSongStructuralCaches();
     rebuildSongCaches();
     res.status(200).json({
       success: true,
@@ -361,9 +361,8 @@ export const likeSong = async (req, res) => {
         });
       }
 
-      // Invalidate caches seamlessly and trigger write-through rebuilding
-      await clearSongCaches();
-      rebuildSongCaches();
+      // Statistics update: Skip global purge to avoid cache thrashing. 
+      // Individual counters sync via TTL or next structural rebuild.
 
       // Broadcast analytics update instantly
       try {
@@ -484,47 +483,69 @@ export const addToRecentlyPlayed = async (req, res) => {
   }
 
   try {
+    console.log("[RecentlyPlayed] Adding song:", songId, "for user:", userId);
+    
+    // Validate ObjectId formats to prevent casting errors
+    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(songId)) {
+      console.error("[RecentlyPlayed] Invalid ID format detected");
+      return res.status(400).json({
+        success: false,
+        message: "Invalid ID format",
+      });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const songObjectId = new mongoose.Types.ObjectId(songId);
+
     // Check if song exists
-    const song = await Song.findById(songId);
+    const song = await Song.findById(songObjectId);
     if (!song) {
+      console.warn("[RecentlyPlayed] Song not found:", songId);
       return res.status(404).json({
         success: false,
         message: "Song not found",
       });
     }
 
-    // Get user and update recently played
-    const user = await User.findById(userId);
-    if (!user) {
+    // Atomic update to recently played list (max 5 items)
+    // 1. Remove song if already present (to move it to top)
+    const pullResult = await User.updateOne(
+      { _id: userObjectId },
+      { $pull: { recentlyPlayed: { song: songObjectId } } }
+    );
+    console.log("[RecentlyPlayed] Pull result:", pullResult.modifiedCount);
+
+    // 2. Add song to top and trim to 5 items atomically
+    const updatedUser = await User.findByIdAndUpdate(
+      userObjectId,
+      {
+        $push: {
+          recentlyPlayed: {
+            $each: [{ song: songObjectId, playedAt: new Date() }],
+            $position: 0,
+            $slice: 5
+          }
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
 
-    // Remove song if already in recently played (and clean up any null references)
-    user.recentlyPlayed = user.recentlyPlayed.filter(
-      (item) => item.song && item.song.toString() !== songId,
-    );
-
-    user.recentlyPlayed.unshift({
-      song: songId,
-      playedAt: new Date(),
-    });
-
-    user.recentlyPlayed = user.recentlyPlayed.slice(0, 5);
-
-    await user.save();
-
     res.status(200).json({
       success: true,
       message: "Song added to recently played",
     });
   } catch (error) {
-    console.error("Add to recently played error:", error);
+    console.error("[RecentlyPlayed Error]:", error);
     res.status(500).json({
       success: false,
-      message: "Error adding to recently played",
+      message: `Error adding to recently played: ${error.message}`,
     });
   }
 };
@@ -740,9 +761,8 @@ export const incrementPlayCount = async (req, res) => {
         { new: true }
       );
 
-      // Invalidate relevant cache dynamically and rapidly restock to prevent missing state
-      await clearSongCaches();
-      rebuildSongCaches();
+      // NOTE: We no longer clear global song/trending caches here to avoid 
+      // Redis flooding during high traffic. Play counts will sync when TTL expires (60s).
 
       // Emit real-time events for live activity and analytics updates
       try {

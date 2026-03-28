@@ -20,9 +20,9 @@ const Navbar = () => {
           <h1 className="text-base font-semibold text-gray-800">Admin Panel</h1>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-emerald-50 px-2.5 py-1 rounded-full">
-            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse-dot"></span>
-            <span className="text-emerald-700 font-medium">Online</span>
+          <div className="flex items-center gap-2.5 text-[10px] font-bold text-gray-400 bg-gray-50/50 px-3 py-1.5 rounded-full ring-1 ring-gray-100 shadow-inner tracking-widest uppercase select-none">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse-dot shadow-[0_0_8px_rgba(16,185,129,0.3)]"></span>
+            <span className="text-emerald-700/80">Systems Online</span>
           </div>
           <button
             onClick={handleLogout}

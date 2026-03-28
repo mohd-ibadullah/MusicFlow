@@ -20,11 +20,14 @@ body {
 
 /* ===== DESIGN TOKENS ===== */
 :root {
-  --color-primary: 59 130 246;
+  --color-primary: 59 130 245;
   --color-primary-hover: 37 99 235;
   --radius-btn: 0.5rem;
-  --radius-card: 0.75rem;
-  --radius-modal: 1rem;
+  --radius-card-lg: 0.75rem;
+  --radius-card-xl: 1rem;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 /* Custom scrollbar (same as user app) */
@@ -55,16 +58,16 @@ body {
 
   /* ===== BUTTONS ===== */
   .btn-admin-primary {
-    @apply px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all duration-200;
-    @apply bg-blue-500 hover:bg-blue-600 active:bg-blue-700;
-    @apply shadow-sm hover:shadow-md;
-    @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500 disabled:hover:shadow-sm;
+    @apply px-5 py-2.5 rounded-lg font-bold text-sm text-white transition-all duration-200 outline-none;
+    @apply bg-blue-600 hover:bg-blue-700 active:bg-blue-800;
+    @apply shadow-sm hover:shadow-md hover:scale-[1.01] active:scale-[0.98];
+    @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100;
   }
 
   .btn-admin-secondary {
-    @apply px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200;
+    @apply px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200;
     @apply border border-gray-200 text-gray-700 bg-white;
-    @apply hover:bg-gray-50 hover:border-gray-300;
+    @apply hover:bg-gray-50 hover:border-gray-300 hover:scale-[1.01] active:scale-[0.98];
   }
 
   .btn-admin-danger {
@@ -98,7 +101,12 @@ body {
 
   /* ===== CARDS ===== */
   .card-admin {
-    @apply bg-white rounded-xl border border-gray-100 shadow-sm;
+    @apply bg-white rounded-xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.02),0_1px_2px_rgba(0,0,0,0.04)];
+    @apply transition-all duration-200;
+  }
+  
+  .card-admin-alt {
+    @apply bg-white rounded-2xl border border-gray-200/60 shadow-[0_2px_4px_rgba(0,0,0,0.03)];
     @apply transition-all duration-200;
   }
 
@@ -108,12 +116,12 @@ body {
 
   /* ===== STAT CARDS ===== */
   .stat-card {
-    @apply card-admin p-5 sm:p-6;
+    @apply card-admin p-5 sm:p-6 bg-gradient-to-b from-white to-gray-50/30;
   }
 
   /* ===== TABLE ===== */
   .table-admin-header {
-    @apply text-xs font-semibold text-gray-500 uppercase tracking-wider;
+    @apply text-xs font-bold text-gray-600 uppercase tracking-widest leading-none;
   }
 
   .table-admin-row {
@@ -144,23 +152,32 @@ body {
     @apply text-gray-400 hover:text-white hover:bg-white/10;
   }
   .sidebar-link.active {
-    @apply text-white bg-blue-500/20 border-l-2 border-blue-400;
+    @apply text-white bg-blue-600/20 border-l-4 border-blue-500 shadow-sm;
   }
 }
 
 /* ===== ANIMATIONS ===== */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+.animate-in { animation: fadeIn 0.3s ease-out; }
+.fade-in { animation-name: fadeIn; }
+.zoom-in-95 { animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.slide-in-from-bottom-4 { animation-name: slideUp; }
 
 .animate-fade-in { animation: fadeIn 0.3s ease-out; }
 .animate-slide-up { animation: slideUp 0.4s ease-out; }

@@ -10,7 +10,6 @@ const Player = () => {
     seekBg,
     seekBar,
     playStatus,
-    time,
     volume,
     isShuffled,
     isRepeating,
@@ -34,6 +33,57 @@ const Player = () => {
   const volumeRef = useRef(null);
 
   const isLiked = track ? isSongLiked(track._id) : false;
+
+  // Local time state to prevent global re-renders
+  const [time, setTime] = useState({
+    currentTime: { second: 0, minute: 0 },
+    totalTime: { second: 0, minute: 0 },
+  });
+
+  const { audioRef } = usePlayer();
+
+  useEffect(() => {
+    const audioElement = audioRef.current;
+    if (!audioElement) return;
+
+    const handleTimeUpdate = () => {
+      if (audioElement.duration && seekBar.current) {
+        const progress = (audioElement.currentTime / audioElement.duration) * 100;
+        seekBar.current.style.width = `${progress}%`;
+        
+        setTime({
+          currentTime: {
+            second: Math.floor(audioElement.currentTime % 60).toString().padStart(2, "0"),
+            minute: Math.floor(audioElement.currentTime / 60),
+          },
+          totalTime: {
+            second: (Math.floor(audioElement.duration % 60) || 0).toString().padStart(2, "0"),
+            minute: Math.floor(audioElement.duration / 60) || 0,
+          },
+        });
+      }
+    };
+
+    const handleLoadedMetadata = () => {
+      if (audioElement.duration) {
+        setTime(prev => ({
+          ...prev,
+          totalTime: {
+            second: Math.floor(audioElement.duration % 60).toString().padStart(2, "0"),
+            minute: Math.floor(audioElement.duration / 60),
+          },
+        }));
+      }
+    };
+
+    audioElement.addEventListener("timeupdate", handleTimeUpdate);
+    audioElement.addEventListener("loadedmetadata", handleLoadedMetadata);
+
+    return () => {
+      audioElement.removeEventListener("timeupdate", handleTimeUpdate);
+      audioElement.removeEventListener("loadedmetadata", handleLoadedMetadata);
+    };
+  }, [audioRef, track]); // Also re-run when track changes
 
   // Close volume popup when clicking outside
   useEffect(() => {

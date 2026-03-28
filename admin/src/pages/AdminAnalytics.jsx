@@ -3,13 +3,48 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { url } from "../App";
 import { toast } from "react-toastify";
+import { 
+  Play, 
+  Plus, 
+  Heart, 
+  PlusSquare, 
+  Disc, 
+  BarChart3, 
+  Users, 
+  Music, 
+  Library, 
+  RefreshCcw, 
+  Info, 
+  Trash2,
+  ListMusic 
+} from "lucide-react";
 
 const TYPE_META = {
-  song_played: { icon: "🎵", color: "bg-blue-50 text-blue-600", label: "Played" },
-  song_added: { icon: "➕", color: "bg-emerald-50 text-emerald-600", label: "Added" },
-  song_liked: { icon: "❤️", color: "bg-pink-50 text-pink-600", label: "Liked" },
-  playlist_created: { icon: "🎶", color: "bg-purple-50 text-purple-600", label: "Playlist" },
-  album_added: { icon: "💿", color: "bg-orange-50 text-orange-600", label: "Album" },
+  song_played: { 
+    icon: Play, 
+    color: "bg-blue-50 text-blue-600", 
+    label: "Played" 
+  },
+  song_added: { 
+    icon: Plus, 
+    color: "bg-emerald-50 text-emerald-600", 
+    label: "Added" 
+  },
+  song_liked: { 
+    icon: Heart, 
+    color: "bg-pink-50 text-pink-600", 
+    label: "Liked" 
+  },
+  playlist_created: { 
+    icon: ListMusic, 
+    color: "bg-purple-50 text-purple-600", 
+    label: "Playlist" 
+  },
+  album_added: { 
+    icon: Library, 
+    color: "bg-orange-50 text-orange-600", 
+    label: "Album" 
+  },
 };
 
 const timeAgo = (dateStr) => {
@@ -24,10 +59,10 @@ const timeAgo = (dateStr) => {
 };
 
 const STAT_CARDS = [
-  { key: "totalStreams", label: "Total Plays", icon: "🎵", color: "from-blue-500 to-blue-600" },
-  { key: "liveListeners", label: "Listening Now", icon: "🎧", color: "from-emerald-500 to-emerald-600", live: true },
-  { key: "totalSongs", label: "Songs", icon: "🎼", color: "from-purple-500 to-purple-600" },
-  { key: "totalAlbums", label: "Albums", icon: "💿", color: "from-orange-500 to-orange-600" },
+  { key: "totalStreams", label: "All-time Listens", icon: Play, color: "from-blue-500 to-blue-600" },
+  { key: "liveListeners", label: "Listening Now", icon: Users, color: "from-emerald-500 to-emerald-600", live: true },
+  { key: "totalSongs", label: "Total Tracks", icon: Music, color: "from-purple-500 to-purple-600" },
+  { key: "totalAlbums", label: "Albums", icon: Disc, color: "from-orange-500 to-orange-600" },
 ];
 
 const AdminAnalytics = () => {
@@ -222,20 +257,18 @@ const AdminAnalytics = () => {
           <p className="text-page-subtitle">Platform performance at a glance</p>
         </div>
         <button onClick={handleRefresh} className="btn-admin-secondary flex items-center gap-1.5 self-start">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-          </svg>
+          <RefreshCcw className="w-3.5 h-3.5" />
           Refresh
         </button>
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {STAT_CARDS.map((stat) => (
-          <div key={stat.key} className="stat-card group">
-            <div className="flex items-start justify-between mb-3">
-              <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center text-white text-base shadow-sm`}>
-                {stat.icon}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-0.5">
+        {STAT_CARDS.map((stat, idx) => (
+          <div key={stat.key} className={`stat-card group ${idx % 2 === 0 ? "card-admin-alt" : ""}`}>
+            <div className="flex items-start justify-between mb-4">
+              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center text-white shadow-md shadow-blue-500/10`}>
+                <stat.icon className="w-5 h-5" />
               </div>
               {stat.live && (
                 <span className="badge-green text-[10px] flex items-center gap-1">
@@ -244,10 +277,10 @@ const AdminAnalytics = () => {
                 </span>
               )}
             </div>
-            <p className="text-2xl font-bold text-gray-900 mb-0.5">
+            <p className="text-[26px] font-extrabold text-gray-900 tracking-tight mb-0.5">
               {getStatValue(stat.key)?.toLocaleString()}
             </p>
-            <p className="text-xs text-gray-500">{stat.label}</p>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
           </div>
         ))}
       </div>
@@ -256,18 +289,18 @@ const AdminAnalytics = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Songs */}
         <div className="card-admin overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="text-section-title">Top Songs</h2>
+          <div className="px-6 py-5 border-b border-gray-100/60 bg-gray-50/10">
+            <h2 className="text-lg font-bold text-gray-900 tracking-tight">Top Songs</h2>
           </div>
           {analytics.topSongs?.length > 0 ? (
             <div className="divide-y divide-gray-50">
               {analytics.topSongs.map((song, index) => (
                 <div key={song._id} className="flex items-center gap-3 px-5 py-3 hover:bg-blue-50/30 transition-colors">
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                    index === 0 ? "bg-amber-100 text-amber-700" :
-                    index === 1 ? "bg-gray-100 text-gray-600" :
-                    index === 2 ? "bg-orange-100 text-orange-700" :
-                    "bg-gray-50 text-gray-500"
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 leading-none ${
+                    index === 0 ? "bg-amber-100 text-amber-700 ring-1 ring-amber-200" :
+                    index === 1 ? "bg-slate-100 text-slate-600 ring-1 ring-slate-200" :
+                    index === 2 ? "bg-orange-100 text-orange-700 ring-1 ring-orange-200" :
+                    "bg-gray-50 text-gray-500 border border-gray-100"
                   }`}>
                     {index + 1}
                   </span>
@@ -276,9 +309,9 @@ const AdminAnalytics = () => {
                     <p className="text-sm font-medium text-gray-900 truncate">{song.name}</p>
                     <p className="text-xs text-gray-500 truncate">{song.artist || song.album}</p>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs font-medium text-gray-700">{song.playCount?.toLocaleString() || 0} plays</p>
-                    <p className="text-[11px] text-gray-400">{song.likeCount?.toLocaleString() || 0} likes</p>
+                  <div className="text-right shrink-0 pr-1">
+                    <p className="text-sm font-bold text-gray-800 leading-tight">{song.playCount?.toLocaleString() || 0} plays</p>
+                    <p className="text-[11px] text-gray-400 font-medium brightness-90">{song.likeCount?.toLocaleString() || 0} likes</p>
                   </div>
                 </div>
               ))}
@@ -289,19 +322,19 @@ const AdminAnalytics = () => {
         </div>
 
         {/* Top Artists */}
-        <div className="card-admin overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="text-section-title">Top Artists</h2>
+        <div className="card-admin-alt overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-100/60 bg-gray-50/10">
+            <h2 className="text-lg font-bold text-gray-900 tracking-tight">Top Artists</h2>
           </div>
           {analytics.topArtists?.length > 0 ? (
             <div className="divide-y divide-gray-50">
               {analytics.topArtists.map((artist, index) => (
                 <div key={artist._id} className="flex items-center gap-3 px-5 py-3 hover:bg-blue-50/30 transition-colors">
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                    index === 0 ? "bg-amber-100 text-amber-700" :
-                    index === 1 ? "bg-gray-100 text-gray-600" :
-                    index === 2 ? "bg-orange-100 text-orange-700" :
-                    "bg-gray-50 text-gray-500"
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 leading-none ${
+                    index === 0 ? "bg-amber-100 text-amber-700 ring-1 ring-amber-200" :
+                    index === 1 ? "bg-slate-100 text-slate-600 ring-1 ring-slate-200" :
+                    index === 2 ? "bg-orange-100 text-orange-700 ring-1 ring-orange-200" :
+                    "bg-gray-50 text-gray-500 border border-gray-100"
                   }`}>
                     {index + 1}
                   </span>
@@ -314,7 +347,7 @@ const AdminAnalytics = () => {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-xs font-medium text-gray-700">{artist.totalPlays?.toLocaleString() || 0}</p>
-                    <p className="text-[11px] text-gray-400">total plays</p>
+                    <p className="text-[10px] font-medium text-gray-400 uppercase tracking-tighter">listens</p>
                   </div>
                 </div>
               ))}
@@ -343,14 +376,30 @@ const AdminAnalytics = () => {
               .filter((item, index, self) => index === self.findIndex((t) => t.message === item.message))
               .slice(0, 20)
               .map((item) => {
-                const meta = TYPE_META[item.type] || { icon: "📌", color: "bg-gray-50 text-gray-600" };
+                const meta = TYPE_META[item.type] || { 
+                  icon: Info, 
+                  color: "bg-gray-50 text-gray-600" 
+                };
+                const Icon = meta.icon;
+                const phrases = {
+                  song_played: ["Started playing", "Listening to", "Enjoying"],
+                  song_added: ["Added to library:", "Newly added:"],
+                  song_liked: ["Liked the track", "Recommended"],
+                };
+                const randomPhrase = phrases[item.type]?.[Math.floor(Math.random() * phrases[item.type].length)] || meta.label;
+                const naturalMsg = item.message.replace(meta.label, randomPhrase);
+
                 return (
-                  <div key={item._id || `${item.type}_${item.createdAt}`} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50/50 transition-colors">
-                    <div className={`w-8 h-8 rounded-lg ${meta.color} flex items-center justify-center text-sm shrink-0`}>
-                      {meta.icon}
+                  <div key={item._id || `${item.type}_${item.createdAt}`} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50/30 transition-all duration-200 border-l-2 border-transparent hover:border-blue-500/20">
+                    <div className={`w-9 h-9 rounded-xl ${meta.color} flex items-center justify-center shadow-inner`}>
+                      <Icon className="w-4 h-4" />
                     </div>
-                    <p className="text-sm text-gray-700 flex-1 min-w-0 truncate">{item.message}</p>
-                    <p className="text-[11px] text-gray-400 whitespace-nowrap shrink-0">{timeAgo(item.createdAt)}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        <span className="font-semibold text-gray-900">{item.message.split(' ')[0]}</span> {item.message.slice(item.message.indexOf(' ') + 1)}
+                      </p>
+                    </div>
+                    <p className="text-[11px] font-semibold text-gray-400 whitespace-nowrap tracking-tight">{timeAgo(item.createdAt)}</p>
                   </div>
                 );
               })}

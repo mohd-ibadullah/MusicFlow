@@ -69,16 +69,12 @@ const PlayerContextProvider = (props) => {
     }
     return null; // Will fallback to songsData[0] inside getSongsData
   });
-  const trackRef = useRef(track); // Keep track of current song for socket emissions
   const [playStatus, setPlayStatus] = useState(false);
+  const trackRef = useRef(track);
   // Keep a ref in sync so closures always read the live value
   useEffect(() => { playStatusRef.current = playStatus; }, [playStatus]);
   // Sync track to ref
   useEffect(() => { trackRef.current = track; }, [track]);
-  const [time, setTime] = useState({
-    currentTime: { second: 0, minute: 0 },
-    totalTime: { second: 0, minute: 0 },
-  });
 
   // Features state
   const [isShuffled, setIsShuffled] = useState(false);
@@ -1279,83 +1275,29 @@ const PlayerContextProvider = (props) => {
     const audioElement = audioRef.current;
 
     const handleEnded = () => {
-      if (isRepeating) {
+      if (isRepeatingRef.current) {
         audioElement.currentTime = 0;
         audioElement.play();
       } else {
-        // Auto-advance to next song in playlist
-        const safePlaylist = Array.isArray(currentPlaylist)
-          ? currentPlaylist
-          : [];
-        if (safePlaylist.length > 0) {
-          next();
-        } else {
-          // If no playlist, just stop — socket emit is handled by el.onended
-          setPlayStatus(false);
-        }
-      }
-    };
-
-    const handleTimeUpdate = () => {
-      if (audioElement && audioElement.duration && seekBar.current) {
-        const progress =
-          (audioElement.currentTime / audioElement.duration) * 100;
-        seekBar.current.style.width = `${progress}%`;
-
-        setTime({
-          currentTime: {
-            second: Math.floor(audioElement.currentTime % 60)
-              .toString()
-              .padStart(2, "0"),
-            minute: Math.floor(audioElement.currentTime / 60),
-          },
-          totalTime: {
-            second: Math.floor(audioElement.duration % 60)
-              .toString()
-              .padStart(2, "0"),
-            minute: Math.floor(audioElement.duration / 60),
-          },
-        });
-      }
-    };
-
-    const handleLoadedMetadata = () => {
-      if (audioElement && audioElement.duration) {
-        setTime({
-          currentTime: {
-            second: Math.floor(audioElement.currentTime % 60)
-              .toString()
-              .padStart(2, "0"),
-            minute: Math.floor(audioElement.currentTime / 60),
-          },
-          totalTime: {
-            second: Math.floor(audioElement.duration % 60)
-              .toString()
-              .padStart(2, "0"),
-            minute: Math.floor(audioElement.duration / 60),
-          },
-        });
+        next();
       }
     };
 
     if (audioElement) {
       audioElement.addEventListener("ended", handleEnded);
-      audioElement.addEventListener("timeupdate", handleTimeUpdate);
-      audioElement.addEventListener("loadedmetadata", handleLoadedMetadata);
       audioElement.volume = volume / 100;
     }
 
     return () => {
       if (audioElement) {
         audioElement.removeEventListener("ended", handleEnded);
-        audioElement.removeEventListener("timeupdate", handleTimeUpdate);
-        audioElement.removeEventListener(
-          "loadedmetadata",
-          handleLoadedMetadata,
-        );
       }
     };
-  }, [isRepeating, next, volume, currentPlaylist, user]);
+  }, [next, volume]);
+
+  // Keep repeat state in ref for events
+  const isRepeatingRef = useRef(isRepeating);
+  useEffect(() => { isRepeatingRef.current = isRepeating; }, [isRepeating]);
 
   // Sync audio src when track changes (not when volume changes - that would reload and stop playback)
   useEffect(() => {
@@ -1398,7 +1340,6 @@ const PlayerContextProvider = (props) => {
       // Player state
       track,
       playStatus,
-      time,
       volume,
 
       // Player controls
@@ -1454,7 +1395,6 @@ const PlayerContextProvider = (props) => {
     [
       track,
       playStatus,
-      time,
       volume,
       isShuffled,
       isRepeating,
