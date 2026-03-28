@@ -1,3 +1,176 @@
+/* Admin Design System — mirrors MusicFlow user-facing frontend */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+* { box-sizing: border-box; }
+
+html {
+  font-family: 'Inter', system-ui, sans-serif;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* ===== DESIGN TOKENS ===== */
+:root {
+  --color-primary: 59 130 246;
+  --color-primary-hover: 37 99 235;
+  --radius-btn: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-modal: 1rem;
+}
+
+/* Custom scrollbar (same as user app) */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #cbd5e1, #94a3b8);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #94a3b8, #64748b);
+}
+
+/* ===== TYPOGRAPHY ===== */
+@layer components {
+  .text-page-title {
+    @apply text-2xl sm:text-3xl font-bold tracking-tight text-gray-900;
+  }
+  .text-page-subtitle {
+    @apply text-sm text-gray-500 mt-1;
+  }
+  .text-section-title {
+    @apply text-lg font-semibold text-gray-900;
+  }
+  .text-label {
+    @apply text-sm font-medium text-gray-700 mb-1.5 block;
+  }
+
+  /* ===== BUTTONS ===== */
+  .btn-admin-primary {
+    @apply px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all duration-200;
+    @apply bg-blue-500 hover:bg-blue-600 active:bg-blue-700;
+    @apply shadow-sm hover:shadow-md;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500 disabled:hover:shadow-sm;
+  }
+
+  .btn-admin-secondary {
+    @apply px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200;
+    @apply border border-gray-200 text-gray-700 bg-white;
+    @apply hover:bg-gray-50 hover:border-gray-300;
+  }
+
+  .btn-admin-danger {
+    @apply px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200;
+    @apply text-red-600 hover:bg-red-50 hover:text-red-700;
+  }
+
+  .btn-admin-ghost {
+    @apply px-3 py-1.5 rounded-md font-medium text-sm text-gray-500 transition-all duration-200;
+    @apply hover:bg-gray-100 hover:text-gray-700;
+  }
+
+  /* ===== INPUTS ===== */
+  .input-admin {
+    @apply w-full px-4 py-2.5 rounded-lg text-sm text-gray-900 bg-white;
+    @apply border border-gray-200 placeholder-gray-400;
+    @apply outline-none transition-all duration-200;
+    @apply focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20;
+  }
+
+  .select-admin {
+    @apply w-full px-4 py-2.5 rounded-lg text-sm text-gray-900 bg-white;
+    @apply border border-gray-200 appearance-none cursor-pointer;
+    @apply outline-none transition-all duration-200;
+    @apply focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+
+  /* ===== CARDS ===== */
+  .card-admin {
+    @apply bg-white rounded-xl border border-gray-100 shadow-sm;
+    @apply transition-all duration-200;
+  }
+
+  .card-admin-hover {
+    @apply card-admin hover:shadow-md hover:border-gray-200;
+  }
+
+  /* ===== STAT CARDS ===== */
+  .stat-card {
+    @apply card-admin p-5 sm:p-6;
+  }
+
+  /* ===== TABLE ===== */
+  .table-admin-header {
+    @apply text-xs font-semibold text-gray-500 uppercase tracking-wider;
+  }
+
+  .table-admin-row {
+    @apply border-b border-gray-50 last:border-b-0 transition-colors duration-150;
+    @apply hover:bg-blue-50/40;
+  }
+
+  /* ===== UPLOAD ZONES ===== */
+  .upload-zone {
+    @apply w-28 h-28 sm:w-32 sm:h-32 rounded-xl cursor-pointer object-cover;
+    @apply border-2 border-dashed border-gray-200 hover:border-blue-400;
+    @apply transition-all duration-200;
+  }
+
+  /* ===== BADGES ===== */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-blue { @apply badge bg-blue-50 text-blue-700; }
+  .badge-green { @apply badge bg-emerald-50 text-emerald-700; }
+  .badge-purple { @apply badge bg-purple-50 text-purple-700; }
+  .badge-orange { @apply badge bg-orange-50 text-orange-700; }
+  .badge-red { @apply badge bg-red-50 text-red-700; }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200;
+    @apply text-gray-400 hover:text-white hover:bg-white/10;
+  }
+  .sidebar-link.active {
+    @apply text-white bg-blue-500/20 border-l-2 border-blue-400;
+  }
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
+.animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* ===== PROGRESS BAR ===== */
+.progress-bar {
+  @apply h-1.5 rounded-full bg-gray-100 overflow-hidden;
+}
+.progress-bar-fill {
+  @apply h-full rounded-full transition-all duration-500 ease-out;
+  background: linear-gradient(90deg, #3b82f6, #6366f1);
+}

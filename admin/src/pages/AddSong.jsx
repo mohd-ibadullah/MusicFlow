@@ -1,6 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { assets } from "../assets/assets";
-import { useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { url } from "../App";
@@ -23,98 +22,37 @@ const AddSong = () => {
   const songInputRef = useRef(null);
 
   const validateFiles = () => {
-    if (!image) {
-      toast.error("Please select an image file");
-      return false;
-    }
-    
-    if (!song) {
-      toast.error("Please select an audio file");
-      return false;
-    }
-
-    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
-    const allowedAudioTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/flac', 'audio/aac', 'audio/ogg'];
-    
-    if (!allowedImageTypes.includes(image.type)) {
-      toast.error("Please select a valid image file (JPEG, PNG, GIF, or WebP)");
-      return false;
-    }
-    
-    if (image.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
-      return false;
-    }
-    
-    if (!allowedAudioTypes.includes(song.type)) {
-      toast.error("Please select a valid audio file (MP3, WAV, FLAC, AAC, or OGG)");
-      return false;
-    }
-    
-    if (song.size > 50 * 1024 * 1024) {
-      toast.error("Audio file size should be less than 50MB");
-      return false;
-    }
-    
+    if (!image) { toast.error("Please select an image file"); return false; }
+    if (!song) { toast.error("Please select an audio file"); return false; }
+    const allowedImageTypes = ["image/jpeg", "image/png", "image/jpg", "image/gif", "image/webp"];
+    const allowedAudioTypes = ["audio/mpeg", "audio/wav", "audio/mp3", "audio/flac", "audio/aac", "audio/ogg"];
+    if (!allowedImageTypes.includes(image.type)) { toast.error("Invalid image format"); return false; }
+    if (image.size > 5 * 1024 * 1024) { toast.error("Image must be under 5 MB"); return false; }
+    if (!allowedAudioTypes.includes(song.type)) { toast.error("Invalid audio format"); return false; }
+    if (song.size > 50 * 1024 * 1024) { toast.error("Audio must be under 50 MB"); return false; }
     return true;
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    setImage(file || false);
-  };
-
-  const handleSongChange = (e) => {
-    const file = e.target.files[0];
-    setSong(file || false);
-  };
-
   const resetForm = () => {
-    setName("");
-    setDescription("");
-    setAlbum("none");
-    setArtist("");
-    setLanguage("Hindi");
-    setImage(false);
-    setSong(false);
+    setName(""); setDescription(""); setAlbum("none"); setArtist(""); setLanguage("Hindi");
+    setImage(false); setSong(false);
     if (imageInputRef.current) imageInputRef.current.value = "";
     if (songInputRef.current) songInputRef.current.value = "";
   };
 
   const onSubmitHandler = async (e) => {
     e.preventDefault();
-    
-    if (!validateFiles()) {
-      return;
-    }
-
-    if (!name.trim()) {
-      toast.error("Please enter a song name");
-      return;
-    }
-
-    if (!description.trim()) {
-      toast.error("Please enter a song description");
-      return;
-    }
-
-    if (!artist.trim()) {
-      toast.error("Please enter the artist name");
-      return;
-    }
-
-    if (!language) {
-      toast.error("Please select a language");
-      return;
-    }
+    if (!validateFiles()) return;
+    if (!name.trim()) { toast.error("Enter a song name"); return; }
+    if (!description.trim()) { toast.error("Enter a description"); return; }
+    if (!artist.trim()) { toast.error("Enter the artist name"); return; }
 
     setLoading(true);
     setUploadProgress(0);
-    setUploadStage("Preparing files...");
+    setUploadStage("Preparing files…");
 
     try {
-      const token = localStorage.getItem('auth_token');
-      
+      const token = localStorage.getItem("auth_token");
       const formData = new FormData();
       formData.append("image", image);
       formData.append("audio", song);
@@ -124,49 +62,34 @@ const AddSong = () => {
       formData.append("artist", artist.trim());
       formData.append("language", language);
 
-      setUploadStage("Uploading to Cloudinary...");
+      setUploadStage("Uploading…");
       setUploadProgress(20);
 
       const response = await axios.post(`${url}/api/song/add`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { "Content-Type": "multipart/form-data", Authorization: `Bearer ${token}` },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
-            const progress = (progressEvent.loaded / progressEvent.total) * 100;
-            setUploadProgress(20 + (progress * 0.6));
+            setUploadProgress(20 + (progressEvent.loaded / progressEvent.total) * 60);
           }
         },
-        timeout: 120000
+        timeout: 120000,
       });
 
-      setUploadStage("Processing audio...");
-      setUploadProgress(80);
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      setUploadStage("Finalizing...");
+      setUploadStage("Processing…");
+      setUploadProgress(90);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
       setUploadProgress(100);
 
-      if (response.data && response.data.success) {
-        toast.success("🎵 Song Added Successfully!");
+      if (response.data?.success) {
+        toast.success("Song added successfully");
         resetForm();
       } else {
-        toast.error(response.data?.message || "Unexpected response from server");
+        toast.error(response.data?.message || "Unexpected error");
       }
-
     } catch (error) {
-      console.error("❌ Add song error:", error);
-      
-      if (error.response) {
-        const errorMessage = error.response.data?.message || error.response.data?.error || "Server error occurred";
-        toast.error(`Failed to add song: ${errorMessage}`);
-      } else if (error.request) {
-        toast.error("No response from server. Please check your connection.");
-      } else {
-        toast.error("Failed to add song. Please try again.");
-      }
+      if (error.response) toast.error(error.response.data?.message || "Server error");
+      else if (error.request) toast.error("No server response");
+      else toast.error("Failed to add song");
     } finally {
       setLoading(false);
       setUploadProgress(0);
@@ -178,216 +101,111 @@ const AddSong = () => {
     try {
       setAlbumsLoading(true);
       const response = await axios.get(`${url}/api/album/list`);
-      
-      if (response.data.success && response.data.allAlbums) {
-        setAlbumData(response.data.allAlbums);
-      } else if (response.data.allAlbums) {
-        setAlbumData(response.data.allAlbums);
-      } else {
-        setAlbumData([]);
-      }
-    } catch (error) {
-      console.error("Error loading albums:", error);
-      setAlbumData([]);
-    } finally {
-      setAlbumsLoading(false);
-    }
+      setAlbumData(response.data.allAlbums || []);
+    } catch { setAlbumData([]); }
+    finally { setAlbumsLoading(false); }
   };
 
-  useEffect(() => {
-    loadAlbumData();
-  }, []);
+  useEffect(() => { loadAlbumData(); }, []);
 
   if (loading) {
     return (
-      <div className="grid place-items-center min-h-[80vh]">
+      <div className="grid place-items-center min-h-[60vh] animate-fade-in">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-gray-400 border-t-green-800 rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600 mb-2 font-medium">{uploadStage}</p>
-          <div className="w-64 bg-gray-200 rounded-full h-2.5 mb-2">
-            <div 
-              className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
-              style={{ width: `${uploadProgress}%` }}
-            ></div>
+          <div className="w-12 h-12 border-[3px] border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm font-medium text-gray-700 mb-3">{uploadStage}</p>
+          <div className="w-56 progress-bar mx-auto mb-2">
+            <div className="progress-bar-fill" style={{ width: `${uploadProgress}%` }}></div>
           </div>
-          <p className="text-sm text-gray-500">{Math.round(uploadProgress)}%</p>
-          <p className="text-xs text-gray-400 mt-4 max-w-sm">
-            {uploadProgress < 50 
-              ? "Uploading files to cloud storage..." 
-              : uploadProgress < 90 
-              ? "Processing audio file..." 
-              : "Finalizing song data..."}
-          </p>
+          <p className="text-xs text-gray-500">{Math.round(uploadProgress)}%</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-8">Add New Song</h1>
-      
-      <form
-        onSubmit={onSubmitHandler}
-        className="flex flex-col gap-8 text-gray-600"
-      >
-        <div className="flex gap-8 flex-wrap">
-          <div className="flex flex-col gap-4">
-            <p className="font-medium">Song File *</p>
-            <input
-              ref={songInputRef}
-              onChange={handleSongChange}
-              type="file"
-              id="song"
-              accept="audio/*"
-              hidden
-            />
-            <label htmlFor="song" className="cursor-pointer">
-              <img
-                src={song ? assets.upload_added : assets.upload_song}
-                className="w-32 h-32 cursor-pointer object-cover rounded-lg border-2 border-dashed border-gray-300"
-                alt="Song file"
-              />
+    <div className="max-w-2xl animate-fade-in">
+      <h1 className="text-page-title mb-1">Add New Song</h1>
+      <p className="text-page-subtitle mb-8">Upload audio and cover art to your library</p>
+
+      <form onSubmit={onSubmitHandler} className="space-y-7">
+        {/* File uploads */}
+        <div className="flex gap-6 flex-wrap">
+          <div className="space-y-2">
+            <label className="text-label">Audio File *</label>
+            <input ref={songInputRef} onChange={(e) => setSong(e.target.files[0] || false)} type="file" id="song" accept="audio/*" hidden />
+            <label htmlFor="song">
+              <img src={song ? assets.upload_added : assets.upload_song} className="upload-zone" alt="Audio" />
             </label>
             {song && (
-              <div className="text-sm text-green-600">
-                <p>✓ {song.name}</p>
-                <p className="text-xs text-gray-500">
-                  Size: {(song.size / (1024 * 1024)).toFixed(2)} MB
-                </p>
-              </div>
+              <p className="text-xs text-emerald-600 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                {song.name} ({(song.size / (1024 * 1024)).toFixed(1)} MB)
+              </p>
             )}
-            <p className="text-xs text-gray-500 max-w-[200px]">
-              Supported: MP3, WAV, FLAC, AAC, OGG (max 50MB)
-            </p>
+            <p className="text-[11px] text-gray-400">MP3, WAV, FLAC, AAC, OGG · Max 50 MB</p>
           </div>
-          
-          <div className="flex flex-col gap-4">
-            <p className="font-medium">Song Cover *</p>
-            <input
-              ref={imageInputRef}
-              onChange={handleImageChange}
-              type="file"
-              id="image"
-              accept="image/*"
-              hidden
-            />
-            <label htmlFor="image" className="cursor-pointer">
-              <img
-                src={image ? URL.createObjectURL(image) : assets.upload_area}
-                className="w-32 h-32 cursor-pointer object-cover rounded-lg border-2 border-dashed border-gray-300"
-                alt="Song cover"
-              />
+
+          <div className="space-y-2">
+            <label className="text-label">Cover Art *</label>
+            <input ref={imageInputRef} onChange={(e) => setImage(e.target.files[0] || false)} type="file" id="image" accept="image/*" hidden />
+            <label htmlFor="image">
+              <img src={image ? URL.createObjectURL(image) : assets.upload_area} className="upload-zone" alt="Cover" />
             </label>
             {image && (
-              <div className="text-sm text-green-600">
-                <p>✓ {image.name}</p>
-                <p className="text-xs text-gray-500">
-                  Size: {(image.size / (1024 * 1024)).toFixed(2)} MB
-                </p>
-              </div>
+              <p className="text-xs text-emerald-600 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                {image.name} ({(image.size / (1024 * 1024)).toFixed(1)} MB)
+              </p>
             )}
-            <p className="text-xs text-gray-500 max-w-[200px]">
-              Supported: JPEG, PNG, GIF, WebP (max 5MB)
-            </p>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="flex flex-col gap-2.5">
-            <p className="font-medium">Song Name *</p>
-            <input
-              onChange={(e) => setName(e.target.value)}
-              value={name}
-              type="text"
-              className="bg-transparent outline-green-600 border-2 border-gray-400 p-3 w-full rounded-lg"
-              placeholder="Enter song name"
-              required
-            />
-          </div>
-          
-          <div className="flex flex-col gap-2.5">
-            <p className="font-medium">Album</p>
-            <select
-              onChange={(e) => setAlbum(e.target.value)}
-              value={album}
-              className="bg-transparent outline-green-600 border-2 border-gray-400 p-3 w-full rounded-lg"
-              disabled={albumsLoading}
-            >
-              <option value="none">None (Single)</option>
-              {albumData.map((item, index) => (
-                <option key={index} value={item.name}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-            {albumsLoading && <p className="text-sm text-gray-500">Loading albums...</p>}
+            <p className="text-[11px] text-gray-400">JPEG, PNG, WebP · Max 5 MB</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="flex flex-col gap-2.5">
-            <p className="font-medium">Artist *</p>
-            <input
-              onChange={(e) => setArtist(e.target.value)}
-              value={artist}
-              type="text"
-              className="bg-transparent outline-green-600 border-2 border-gray-400 p-3 w-full rounded-lg"
-              placeholder="Artist name"
-              required
-            />
+        {/* Fields */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className="text-label">Song Name *</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="input-admin" placeholder="Enter song name" required />
           </div>
-          <div className="flex flex-col gap-2.5">
-            <p className="font-medium">Language *</p>
-            <select
-              onChange={(e) => setLanguage(e.target.value)}
-              value={language}
-              className="bg-transparent outline-green-600 border-2 border-gray-400 p-3 w-full rounded-lg"
-            >
+          <div>
+            <label className="text-label">Artist *</label>
+            <input value={artist} onChange={(e) => setArtist(e.target.value)} className="input-admin" placeholder="Artist name" required />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className="text-label">Album</label>
+            <select value={album} onChange={(e) => setAlbum(e.target.value)} className="select-admin" disabled={albumsLoading}>
+              <option value="none">None (Single)</option>
+              {albumData.map((item) => (
+                <option key={item._id || item.name} value={item.name}>{item.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-label">Language *</label>
+            <select value={language} onChange={(e) => setLanguage(e.target.value)} className="select-admin">
               <option value="Hindi">Hindi</option>
               <option value="English">English</option>
               <option value="Telugu">Telugu</option>
             </select>
           </div>
         </div>
-        
-        <div className="flex flex-col gap-2.5">
-          <p className="font-medium">Song Description *</p>
-          <input
-            onChange={(e) => setDescription(e.target.value)}
-            value={description}
-            type="text"
-            className="bg-transparent outline-green-600 border-2 border-gray-400 p-3 w-full rounded-lg"
-            placeholder="Enter song description"
-            required
-          />
+
+        <div>
+          <label className="text-label">Description *</label>
+          <input value={description} onChange={(e) => setDescription(e.target.value)} className="input-admin" placeholder="A brief description of the song" required />
         </div>
-        
+
         <button
           type="submit"
-          className="text-base bg-green-600 text-white py-3 px-16 cursor-pointer hover:bg-green-700 transition-colors disabled:bg-gray-400 rounded-lg font-medium self-start"
+          className="btn-admin-primary"
           disabled={!song || !image || !name.trim() || !description.trim() || !artist.trim() || !language || loading}
         >
-          ADD SONG
+          Add Song
         </button>
-        
-        {/* Upload info */}
-        {song && (
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 w-full max-w-md">
-            <p className="text-sm text-blue-700 font-medium">
-              ⏱️ Upload Information
-            </p>
-            <p className="text-xs text-blue-600 mt-1">
-              Audio: {(song.size / (1024 * 1024)).toFixed(2)} MB
-            </p>
-            <p className="text-xs text-blue-600">
-              Image: {image ? `${(image.size / (1024 * 1024)).toFixed(2)} MB` : "Not selected"}
-            </p>
-            <p className="text-xs text-blue-600 mt-1">
-              ✅ Duration will be automatically estimated
-            </p>
-          </div>
-        )}
       </form>
     </div>
   );

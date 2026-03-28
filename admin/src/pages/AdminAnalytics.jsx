@@ -5,23 +5,30 @@ import { url } from "../App";
 import { toast } from "react-toastify";
 
 const TYPE_META = {
-  song_played: { icon: "🎵", label: "Played" },
-  song_added: { icon: "➕", label: "Added" },
-  song_liked: { icon: "❤️", label: "Liked" },
-  playlist_created: { icon: "🎶", label: "Playlist" },
-  album_added: { icon: "💿", label: "Album" },
+  song_played: { icon: "🎵", color: "bg-blue-50 text-blue-600", label: "Played" },
+  song_added: { icon: "➕", color: "bg-emerald-50 text-emerald-600", label: "Added" },
+  song_liked: { icon: "❤️", color: "bg-pink-50 text-pink-600", label: "Liked" },
+  playlist_created: { icon: "🎶", color: "bg-purple-50 text-purple-600", label: "Playlist" },
+  album_added: { icon: "💿", color: "bg-orange-50 text-orange-600", label: "Album" },
 };
 
 const timeAgo = (dateStr) => {
   const seconds = Math.floor((Date.now() - new Date(dateStr)) / 1000);
   if (seconds < 60) return "just now";
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 };
+
+const STAT_CARDS = [
+  { key: "totalStreams", label: "Total Plays", icon: "🎵", color: "from-blue-500 to-blue-600" },
+  { key: "liveListeners", label: "Listening Now", icon: "🎧", color: "from-emerald-500 to-emerald-600", live: true },
+  { key: "totalSongs", label: "Songs", icon: "🎼", color: "from-purple-500 to-purple-600" },
+  { key: "totalAlbums", label: "Albums", icon: "💿", color: "from-orange-500 to-orange-600" },
+];
 
 const AdminAnalytics = () => {
   const [analytics, setAnalytics] = useState(null);
@@ -36,37 +43,10 @@ const AdminAnalytics = () => {
     Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
   });
 
-  // Helper function to generate unique key for activity deduplication
-  const getActivityUniqueKey = (activity) => {
-    // Extract songId from activity (might be in songId field or embedded in message)
-    let songId = activity.songId || null;
-
-    // Try to extract song identifier from message if not directly available
-    if (!songId && activity.message) {
-      // Common message patterns in the backend:
-      // - "Song Name" was played
-      // - "Song Name" was liked
-      // - "Song Name" by Artist was played
-      // - User is listening to "Song Name"
-      const match = activity.message.match(/"([^"]+)"/);
-      if (match) {
-        // Use the song name as a proxy for songId when actual ID is not available
-        // This helps deduplicate even when backend doesn't send songId
-        songId = match[1].toLowerCase().replace(/\s+/g, '_');
-      }
-    }
-
-    const timestamp = new Date(activity.createdAt);
-    const minuteTimestamp = Math.floor(timestamp.getTime() / 60000); // Round to minute
-    return `${activity.type}|${activity.userId}|${songId}|${minuteTimestamp}`;
-  };
-
   const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${url}/api/admin/analytics`, {
-        headers: authHeaders(),
-      });
+      const response = await axios.get(`${url}/api/admin/analytics`, { headers: authHeaders() });
       if (response.data.success) {
         setAnalytics(response.data.data);
       } else {
@@ -84,28 +64,18 @@ const AdminAnalytics = () => {
 
   const fetchActivity = useCallback(async (merge = true) => {
     try {
-      const response = await axios.get(`${url}/api/admin/recent-activity`, {
-        headers: authHeaders(),
-      });
+      const response = await axios.get(`${url}/api/admin/recent-activity`, { headers: authHeaders() });
       if (response.data.success) {
         if (merge) {
-          // Because the backend now perfectly records 'song_played' and emits 'activity_created' uniformly,
-          // we do not need the wild string-matching deduction logic. Just prepend the fresh socket array
-          // and deduplicate exactly by Database ID on top of the backend fresh fetch.
           setActivity(prev => {
             const backendActivities = response.data.data;
             const merged = [...backendActivities, ...prev];
-            
-            // Standard deterministic Deduplication by _id 
             const uniqueMap = new Map();
             merged.forEach(item => { if (item && item._id) uniqueMap.set(item._id.toString(), item); });
             const unique = Array.from(uniqueMap.values());
-            
-            const limited = unique.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 20);
-            return limited;
+            return unique.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 20);
           });
         } else {
-          // Full replace (used on initial load)
           setActivity(response.data.data);
         }
         setActivityLoading(false);
@@ -116,7 +86,6 @@ const AdminAnalytics = () => {
     }
   }, []);
 
-  // Add new activity to the list (for real-time updates directly sourced from database hooks)
   const addActivity = useCallback((newActivity) => {
     setActivity(prev => {
       const activityObj = {
@@ -125,85 +94,52 @@ const AdminAnalytics = () => {
         message: newActivity.message || "New activity",
         createdAt: newActivity.createdAt || new Date().toISOString(),
         userId: newActivity.userId || null,
-        songId: newActivity.songId || null
+        songId: newActivity.songId || null,
       };
-
-      // Filter out duplicates by exact database ID and insert new activity at beginning
       const filteredPrev = prev.filter(item => item._id?.toString() !== activityObj._id?.toString());
       return [activityObj, ...filteredPrev].slice(0, 20);
     });
   }, []);
 
-  // Update top songs when song is played or liked
   const updateTopSongs = useCallback((payload = null) => {
     if (!payload?.songId) return;
-
     setAnalytics(prev => {
       if (!prev) return prev;
       const updated = { ...prev };
-
-      // Update total streams count if it was a song_played event
-      if (payload.type === "song_played" && typeof updated.totalStreams === 'number') {
+      if (payload.type === "song_played" && typeof updated.totalStreams === "number") {
         updated.totalStreams += 1;
       }
-
-      // Update top songs
       if (updated.topSongs) {
         updated.topSongs = [...updated.topSongs];
         const songIndex = updated.topSongs.findIndex(song =>
           song._id === payload.songId || song._id?.toString() === payload.songId
         );
-
         if (songIndex !== -1) {
           if (payload.type === "song_played") {
-            updated.topSongs[songIndex] = {
-              ...updated.topSongs[songIndex],
-              playCount: (updated.topSongs[songIndex].playCount || 0) + 1
-            };
-            // Re-sort top songs by playCount (descending)
+            updated.topSongs[songIndex] = { ...updated.topSongs[songIndex], playCount: (updated.topSongs[songIndex].playCount || 0) + 1 };
             updated.topSongs.sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
-          } else if (payload.type === "song_liked" && payload.likeCount !== undefined) {
-             updated.topSongs[songIndex] = {
-               ...updated.topSongs[songIndex],
-               likeCount: payload.likeCount
-             };
-          } else if (payload.type === "song_unliked" && payload.likeCount !== undefined) {
-             updated.topSongs[songIndex] = {
-               ...updated.topSongs[songIndex],
-               likeCount: payload.likeCount
-             };
+          } else if ((payload.type === "song_liked" || payload.type === "song_unliked") && payload.likeCount !== undefined) {
+            updated.topSongs[songIndex] = { ...updated.topSongs[songIndex], likeCount: payload.likeCount };
           }
         }
       }
-
-      // Update top artists if it's a song_played event
       if (payload.type === "song_played" && payload.artist && updated.topArtists) {
         updated.topArtists = [...updated.topArtists];
-        const artistIndex = updated.topArtists.findIndex(artist =>
-          artist.name === payload.artist || artist._id === payload.artist
-        );
-
+        const artistIndex = updated.topArtists.findIndex(a => a.name === payload.artist || a._id === payload.artist);
         if (artistIndex !== -1) {
-          updated.topArtists[artistIndex] = {
-            ...updated.topArtists[artistIndex],
-            totalPlays: (updated.topArtists[artistIndex].totalPlays || 0) + 1
-          };
+          updated.topArtists[artistIndex] = { ...updated.topArtists[artistIndex], totalPlays: (updated.topArtists[artistIndex].totalPlays || 0) + 1 };
           updated.topArtists.sort((a, b) => (b.totalPlays || 0) - (a.totalPlays || 0));
         }
       }
-
       return updated;
     });
   }, []);
 
   useEffect(() => {
-    // Initial fetch ONLY
     fetchAnalytics();
-    fetchActivity(false); // Don't merge on initial load
-    // Removed all periodic pollings and setTimeouts exactly as requested
+    fetchActivity(false);
   }, [fetchAnalytics, fetchActivity]);
 
-  // Real-time socket connection for live listener count and activity updates
   useEffect(() => {
     let mounted = true;
     let reconnectTimeout = null;
@@ -212,80 +148,27 @@ const AdminAnalytics = () => {
       try {
         const { io } = await import("socket.io-client");
         const socket = io({ path: "/socket.io", transports: ["polling", "websocket"] });
-
-        if (!mounted) {
-          socket.disconnect();
-          return;
-        }
+        if (!mounted) { socket.disconnect(); return; }
 
         socketRef.current = socket;
         socketConnectedRef.current = false;
 
         socket.on("connect", () => {
           socketConnectedRef.current = true;
-          console.log("[Admin Analytics] Socket connected");
-
-          // Request current listener count from server ONLY. 
-          // Removed duplicate fetchAnalytics/fetchActivity calls on reconnect.
           socket.emit("get_listeners");
         });
-
-        socket.on("disconnect", () => {
-          socketConnectedRef.current = false;
-          console.log("[Admin Analytics] Socket disconnected");
-        });
-
+        socket.on("disconnect", () => { socketConnectedRef.current = false; });
         socket.on("connect_error", (err) => {
-          console.warn("[Admin Analytics] Socket connection error:", err.message);
           socketConnectedRef.current = false;
-
-          // Attempt reconnection after delay
           if (mounted) {
             clearTimeout(reconnectTimeout);
-            reconnectTimeout = setTimeout(() => {
-              if (socketRef.current && !socketRef.current.connected) {
-                console.log("[Admin Analytics] Attempting to reconnect socket...");
-                socketRef.current.connect();
-              }
-            }, 3000);
+            reconnectTimeout = setTimeout(() => { if (socketRef.current && !socketRef.current.connected) socketRef.current.connect(); }, 3000);
           }
         });
-
-        socket.on("users_listening", (count) => {
-          if (!mounted) return;
-          setLiveListeners(typeof count === "number" ? Math.max(0, count) : 0);
-        });
-
-        // Listen for individual user listening events
-        socket.on("user_listening", (payload) => {
-          if (!mounted) return;
-          console.log("[Admin Analytics] Received user_listening:", payload);
-
-          // Explicitly restore activity feed generation for "song played" actions purely optimistically
-          addActivity({
-            type: "song_played",
-            message: `${payload.userName || "User"} is listening to "${payload.songName || "a song"}"`,
-            userId: payload.userId,
-            songId: payload.songId || null
-          });
-        });
-
-        // Listen for new activity events (if backend emits them)
-        socket.on("activity_created", (newActivity) => {
-          if (!mounted) return;
-          console.log("[Admin Analytics] New activity:", newActivity);
-          addActivity(newActivity);
-        });
-
-        // Listen for analytics updates (when song play counts change)
-        socket.on("analytics_updated", (payload) => {
-          if (!mounted) return;
-          console.log("[Admin Analytics] Analytics updated:", payload);
-
-          // Immediately update top songs/artists when analytics change
-          updateTopSongs(payload);
-        });
-
+        socket.on("users_listening", (count) => { if (mounted) setLiveListeners(typeof count === "number" ? Math.max(0, count) : 0); });
+        socket.on("user_listening", () => {});
+        socket.on("activity_created", (newActivity) => { if (mounted) addActivity(newActivity); });
+        socket.on("analytics_updated", (payload) => { if (mounted) updateTopSongs(payload); });
       } catch (err) {
         console.warn("[Admin Analytics] Socket not available:", err.message);
       }
@@ -293,32 +176,29 @@ const AdminAnalytics = () => {
 
     connectSocket();
 
-    // Fallback fully removed to prevent background fetching loop. API load strictly via initial mount.
-
     return () => {
       mounted = false;
       clearTimeout(reconnectTimeout);
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-        socketConnectedRef.current = false;
-      }
+      if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; socketConnectedRef.current = false; }
     };
   }, [fetchAnalytics, fetchActivity, addActivity]);
 
-  const handleRefresh = () => {
-    console.log("[Admin Analytics] Manual refresh triggered");
-    fetchAnalytics();
-    // Use merge mode for activity refresh to preserve socket activities
-    fetchActivity(true);
+  const handleRefresh = () => { fetchAnalytics(); fetchActivity(true); };
+
+  // Helper to get stat value
+  const getStatValue = (key) => {
+    if (key === "liveListeners") return liveListeners;
+    return analytics?.[key] || 0;
   };
+
+  /* ===== RENDER ===== */
 
   if (loading) {
     return (
-      <div className="grid place-items-center min-h-[80vh]">
+      <div className="grid place-items-center min-h-[60vh] animate-fade-in">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-gray-400 border-t-green-800 rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600">Loading analytics...</p>
+          <div className="w-10 h-10 border-[3px] border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-sm text-gray-500">Loading analytics…</p>
         </div>
       </div>
     );
@@ -326,179 +206,160 @@ const AdminAnalytics = () => {
 
   if (!analytics) {
     return (
-      <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-        <p className="text-gray-500 text-lg mb-2">Failed to load analytics</p>
-        <button
-          onClick={fetchAnalytics}
-          className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-        >
-          Try Again
-        </button>
+      <div className="card-admin text-center py-16 px-6 animate-fade-in">
+        <p className="text-gray-700 font-medium mb-3">Unable to load analytics</p>
+        <button onClick={fetchAnalytics} className="btn-admin-primary">Try Again</button>
       </div>
     );
   }
 
   return (
-    <div className="w-full">
-      <div className="flex justify-between items-center mb-6">
+    <div className="w-full space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
-          <p className="text-gray-600 mt-1">Platform performance and user engagement metrics</p>
+          <h1 className="text-page-title">Analytics</h1>
+          <p className="text-page-subtitle">Platform performance at a glance</p>
         </div>
-        <button
-          onClick={handleRefresh}
-          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 transition-colors"
-        >
-          🔄 Refresh
+        <button onClick={handleRefresh} className="btn-admin-secondary flex items-center gap-1.5 self-start">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+          </svg>
+          Refresh
         </button>
       </div>
 
-      {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Streams</p>
-              <p className="text-3xl font-bold text-gray-900">{analytics.totalStreams?.toLocaleString() || 0}</p>
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {STAT_CARDS.map((stat) => (
+          <div key={stat.key} className="stat-card group">
+            <div className="flex items-start justify-between mb-3">
+              <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center text-white text-base shadow-sm`}>
+                {stat.icon}
+              </div>
+              {stat.live && (
+                <span className="badge-green text-[10px] flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse-dot"></span>
+                  Live
+                </span>
+              )}
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">🎵</span>
-            </div>
+            <p className="text-2xl font-bold text-gray-900 mb-0.5">
+              {getStatValue(stat.key)?.toLocaleString()}
+            </p>
+            <p className="text-xs text-gray-500">{stat.label}</p>
           </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Live Listeners</p>
-              <p className="text-3xl font-bold text-gray-900">{liveListeners.toLocaleString()}</p>
-              <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full inline-block animate-pulse"></span>
-                Real-time
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">🎧</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Songs</p>
-              <p className="text-3xl font-bold text-gray-900">{analytics.totalSongs?.toLocaleString() || 0}</p>
-            </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">🎼</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Albums</p>
-              <p className="text-3xl font-bold text-gray-900">{analytics.totalAlbums?.toLocaleString() || 0}</p>
-            </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">💿</span>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Top Songs */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Top Songs</h2>
-        {analytics.topSongs?.length > 0 ? (
-          <div className="space-y-4">
-            {analytics.topSongs.map((song, index) => (
-              <div key={song._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold text-gray-600">
-                    {index + 1}
-                  </div>
-                  <img
-                    src={song.image}
-                    alt={song.name}
-                    className="w-12 h-12 rounded-lg object-cover"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-900">{song.name}</p>
-                    <p className="text-sm text-gray-600">{song.album}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-600">{song.playCount?.toLocaleString() || 0} plays</p>
-                  <p className="text-sm text-gray-600">{song.likeCount?.toLocaleString() || 0} likes</p>
-                </div>
-              </div>
-            ))}
+      {/* Two-column layout: Top Songs + Top Artists */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Songs */}
+        <div className="card-admin overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="text-section-title">Top Songs</h2>
           </div>
-        ) : (
-          <p className="text-gray-500 text-center py-8">No song data available</p>
-        )}
-      </div>
+          {analytics.topSongs?.length > 0 ? (
+            <div className="divide-y divide-gray-50">
+              {analytics.topSongs.map((song, index) => (
+                <div key={song._id} className="flex items-center gap-3 px-5 py-3 hover:bg-blue-50/30 transition-colors">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                    index === 0 ? "bg-amber-100 text-amber-700" :
+                    index === 1 ? "bg-gray-100 text-gray-600" :
+                    index === 2 ? "bg-orange-100 text-orange-700" :
+                    "bg-gray-50 text-gray-500"
+                  }`}>
+                    {index + 1}
+                  </span>
+                  <img src={song.image} alt={song.name} className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 truncate">{song.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{song.artist || song.album}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-medium text-gray-700">{song.playCount?.toLocaleString() || 0} plays</p>
+                    <p className="text-[11px] text-gray-400">{song.likeCount?.toLocaleString() || 0} likes</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-10">No song data yet</p>
+          )}
+        </div>
 
-      {/* Top Artists */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Top Artists</h2>
-        {analytics.topArtists?.length > 0 ? (
-          <div className="space-y-4">
-            {analytics.topArtists.map((artist, index) => (
-              <div key={artist._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold text-gray-600">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{artist.name}</p>
-                    <p className="text-sm text-gray-600">{artist.totalSongs} songs</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-600">{artist.totalPlays?.toLocaleString() || 0} total plays</p>
-                </div>
-              </div>
-            ))}
+        {/* Top Artists */}
+        <div className="card-admin overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="text-section-title">Top Artists</h2>
           </div>
-        ) : (
-          <p className="text-gray-500 text-center py-8">No artist data available</p>
-        )}
+          {analytics.topArtists?.length > 0 ? (
+            <div className="divide-y divide-gray-50">
+              {analytics.topArtists.map((artist, index) => (
+                <div key={artist._id} className="flex items-center gap-3 px-5 py-3 hover:bg-blue-50/30 transition-colors">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                    index === 0 ? "bg-amber-100 text-amber-700" :
+                    index === 1 ? "bg-gray-100 text-gray-600" :
+                    index === 2 ? "bg-orange-100 text-orange-700" :
+                    "bg-gray-50 text-gray-500"
+                  }`}>
+                    {index + 1}
+                  </span>
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                    {artist.name?.charAt(0)?.toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 truncate">{artist.name}</p>
+                    <p className="text-xs text-gray-500">{artist.totalSongs} {artist.totalSongs === 1 ? "song" : "songs"}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-medium text-gray-700">{artist.totalPlays?.toLocaleString() || 0}</p>
+                    <p className="text-[11px] text-gray-400">total plays</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-10">No artist data yet</p>
+          )}
+        </div>
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Activity</h2>
+      <div className="card-admin overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-section-title">Recent Activity</h2>
+          {!activityLoading && activity.length > 0 && (
+            <span className="text-xs text-gray-400">{activity.length} events</span>
+          )}
+        </div>
         {activityLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="w-8 h-8 border-4 border-gray-300 border-t-green-600 rounded-full animate-spin"></div>
+          <div className="flex justify-center py-10">
+            <div className="w-7 h-7 border-[3px] border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
           </div>
         ) : activity.length > 0 ? (
-          <div className="space-y-3">
+          <div className="divide-y divide-gray-50">
             {activity
-              .filter((item, index, self) => 
-                index === self.findIndex((t) => t.message === item.message)
-              )
+              .filter((item, index, self) => index === self.findIndex((t) => t.message === item.message))
               .slice(0, 20)
-              .map((item, index) => {
-              const meta = TYPE_META[item.type] || { icon: "📌", label: "" };
-              // Create a stable key using _id if available, otherwise use a combination of content and timestamp
-              const stableKey = item._id || `${item.type}_${item.message}_${item.createdAt}_${index}`;
-              return (
-                <div key={stableKey} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-lg">{meta.icon}</span>
-                    <p className="text-sm text-gray-700">{item.message}</p>
+              .map((item) => {
+                const meta = TYPE_META[item.type] || { icon: "📌", color: "bg-gray-50 text-gray-600" };
+                return (
+                  <div key={item._id || `${item.type}_${item.createdAt}`} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50/50 transition-colors">
+                    <div className={`w-8 h-8 rounded-lg ${meta.color} flex items-center justify-center text-sm shrink-0`}>
+                      {meta.icon}
+                    </div>
+                    <p className="text-sm text-gray-700 flex-1 min-w-0 truncate">{item.message}</p>
+                    <p className="text-[11px] text-gray-400 whitespace-nowrap shrink-0">{timeAgo(item.createdAt)}</p>
                   </div>
-                  <p className="text-xs text-gray-400 whitespace-nowrap ml-4">{timeAgo(item.createdAt)}</p>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-8">No activity yet — it will appear here as users interact with the platform</p>
+          <div className="text-center py-12">
+            <p className="text-sm text-gray-500 mb-1">No activity yet</p>
+            <p className="text-xs text-gray-400">Events will appear here as users interact with the platform</p>
+          </div>
         )}
       </div>
     </div>

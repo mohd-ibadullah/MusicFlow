@@ -772,7 +772,7 @@ export const incrementPlayCount = async (req, res) => {
           // Unconditionally persist to DB so "Recent Activity" doesn't disappear on refresh
           await logActivity({
             type: "song_played",
-            message: `"${updatedSong.name}" by ${updatedSong.artist} was played`,
+            message: `${userName || "Someone"} played "${updatedSong.name}" by ${updatedSong.artist}`,
             userId: req.user?.userId || null, 
             req
           });

@@ -1,71 +1,55 @@
 import React from "react";
-import { assets } from "../assets/assets.js";
 import { NavLink } from "react-router-dom";
+import { assets } from "../assets/assets.js";
+
+const navItems = [
+  { to: "/add-song", icon: assets.add_song, label: "Add Song", isImg: true },
+  { to: "/list-song", icon: assets.song_icon, label: "Songs", isImg: true },
+  { to: "/add-album", icon: assets.add_album, label: "Add Album", isImg: true },
+  { to: "/list-album", icon: assets.album_icon, label: "Albums", isImg: true },
+  { to: "/analytics", icon: "📊", label: "Analytics", isImg: false },
+];
+
 const SideBar = () => {
   return (
-    <div className="bg-gradient-to-b from-gray-900 to-gray-800 min-h-screen pl-[4vw] shadow-xl">
-      {/* MusicFlow Branding */}
-      <div className="mt-5 flex items-center gap-3">
-        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+    <aside className="bg-gray-900 min-h-screen w-16 sm:w-56 flex flex-col border-r border-gray-800/60 transition-all duration-300">
+      {/* Branding */}
+      <div className="px-4 py-5 flex items-center gap-2.5 border-b border-gray-800/40">
+        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shrink-0">
           <span className="text-white font-bold text-sm">M</span>
         </div>
-        <div className="hidden sm:block">
-          <span className="font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent text-lg">
-            MusicFlow
-          </span>
-        </div>
-        <div className="sm:hidden block">
-          <span className="font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent text-sm">
-            M
-          </span>
-        </div>
+        <span className="hidden sm:block font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 text-base">
+          MusicFlow
+        </span>
       </div>
-      <div className="flex flex-col gap-5 mt-10">
-        <NavLink
-          to="/add-song"
-          className="flex items-center gap-2.5 text-gray-200 bg-white/10 backdrop-blur-sm border border-white/20 p-3 pr-[max(8vw,10px)] rounded-lg hover:bg-white/20 transition-all duration-300 text-sm font-medium"
-        >
-          <img src={assets.add_song} className="w-5" alt="" />
-          <p className="hidden sm:block">Add Song</p>
-        </NavLink>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-2.5 py-4 flex flex-col gap-1">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? "active" : ""}`
+            }
+          >
+            {item.isImg ? (
+              <img src={item.icon} className="w-5 h-5 opacity-80" alt="" />
+            ) : (
+              <span className="text-base w-5 text-center">{item.icon}</span>
+            )}
+            <span className="hidden sm:block">{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div className="px-4 py-4 border-t border-gray-800/40">
+        <p className="hidden sm:block text-[10px] text-gray-600 text-center">
+          MusicFlow Admin v2
+        </p>
       </div>
-      <div className="flex flex-col gap-5 mt-10">
-        <NavLink
-          to="/list-song"
-          className="flex items-center gap-2.5 text-gray-200 bg-white/10 backdrop-blur-sm border border-white/20 p-3 pr-[max(8vw,10px)] rounded-lg hover:bg-white/20 transition-all duration-300 text-sm font-medium"
-        >
-          <img src={assets.song_icon} className="w-5" alt="" />
-          <p className="hidden sm:block">List Songs</p>
-        </NavLink>
-      </div>
-      <div className="flex flex-col gap-5 mt-10">
-        <NavLink
-          to="/add-album"
-          className="flex items-center gap-2.5 text-gray-200 bg-white/10 backdrop-blur-sm border border-white/20 p-3 pr-[max(8vw,10px)] rounded-lg hover:bg-white/20 transition-all duration-300 text-sm font-medium"
-        >
-          <img src={assets.add_album} className="w-5" alt="" />
-          <p className="hidden sm:block">Add Album</p>
-        </NavLink>
-      </div>
-      <div className="flex flex-col gap-5 mt-10">
-        <NavLink
-          to="/list-album"
-          className="flex items-center gap-2.5 text-gray-200 bg-white/10 backdrop-blur-sm border border-white/20 p-3 pr-[max(8vw,10px)] rounded-lg hover:bg-white/20 transition-all duration-300 text-sm font-medium"
-        >
-          <img src={assets.album_icon} className="w-5" alt="" />
-          <p className="hidden sm:block">List Albums</p>
-        </NavLink>
-      </div>
-      <div className="flex flex-col gap-5 mt-10">
-        <NavLink
-          to="/analytics"
-          className="flex items-center gap-2.5 text-gray-200 bg-white/10 backdrop-blur-sm border border-white/20 p-3 pr-[max(8vw,10px)] rounded-lg hover:bg-white/20 transition-all duration-300 text-sm font-medium"
-        >
-          <span className="text-lg">📊</span>
-          <p className="hidden sm:block">Analytics</p>
-        </NavLink>
-      </div>
-    </div>
+    </aside>
   );
 };
 

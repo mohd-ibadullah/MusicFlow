@@ -7,30 +7,32 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    delete axios.defaults.headers.common['Authorization'];
-    toast.success('Logged out successfully');
-    navigate('/admin-login');
+    localStorage.removeItem("auth_token");
+    delete axios.defaults.headers.common["Authorization"];
+    toast.success("Logged out successfully");
+    navigate("/admin-login");
   };
 
   return (
-    <div className="nav w-full border-b-2 border-gray-800 px-5 sm:px-12 py-5 text-lg bg-white/95 backdrop-blur-sm">
+    <header className="w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-5 sm:px-8 py-3.5 sticky top-0 z-30">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-800">Admin Panel</h1>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-            <span>Online</span>
+        <div>
+          <h1 className="text-base font-semibold text-gray-800">Admin Panel</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-emerald-50 px-2.5 py-1 rounded-full">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse-dot"></span>
+            <span className="text-emerald-700 font-medium">Online</span>
           </div>
           <button
             onClick={handleLogout}
-            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium"
+            className="btn-admin-secondary text-xs !px-3 !py-1.5"
           >
             Logout
           </button>
         </div>
       </div>
-    </div>
+    </header>
   );
 };
 

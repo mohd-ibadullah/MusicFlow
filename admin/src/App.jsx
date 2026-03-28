@@ -28,7 +28,7 @@ const App = () => {
                 <SideBar />
                 <div className="flex-1 flex flex-col">
                   <Navbar />
-                  <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 p-5 sm:p-8">
+                  <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 via-white to-gray-50 p-5 sm:p-7 lg:p-8">
                     <Routes>
                       <Route path="/" element={<Navigate to="/list-song" replace />} />
                       <Route path="/add-song" element={<AddSong />} />
