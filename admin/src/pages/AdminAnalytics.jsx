@@ -59,10 +59,10 @@ const timeAgo = (dateStr) => {
 };
 
 const STAT_CARDS = [
-  { key: "totalStreams", label: "All-time Listens", icon: Play, color: "from-blue-500 to-blue-600" },
-  { key: "liveListeners", label: "Listening Now", icon: Users, color: "from-emerald-500 to-emerald-600", live: true },
-  { key: "totalSongs", label: "Total Tracks", icon: Music, color: "from-purple-500 to-purple-600" },
-  { key: "totalAlbums", label: "Albums", icon: Disc, color: "from-orange-500 to-orange-600" },
+  { key: "totalStreams", label: "Total Vibes", icon: Play, color: "from-blue-500 to-blue-600" },
+  { key: "liveListeners", label: "Active Now", icon: Users, color: "from-emerald-500 to-emerald-600", live: true },
+  { key: "totalSongs", label: "Music Library", icon: Music, color: "from-purple-500 to-purple-600" },
+  { key: "totalAlbums", label: "Collections", icon: Disc, color: "from-orange-500 to-orange-600" },
 ];
 
 const AdminAnalytics = () => {
@@ -253,8 +253,8 @@ const AdminAnalytics = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-page-title">Analytics</h1>
-          <p className="text-page-subtitle">Platform performance at a glance</p>
+          <h1 className="text-page-title">The Pulse</h1>
+          <p className="text-page-subtitle">Your platform's heartbeat</p>
         </div>
         <button onClick={handleRefresh} className="btn-admin-secondary flex items-center gap-1.5 self-start">
           <RefreshCcw className="w-3.5 h-3.5" />
@@ -361,7 +361,7 @@ const AdminAnalytics = () => {
       {/* Recent Activity */}
       <div className="card-admin overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-section-title">Recent Activity</h2>
+          <h2 className="text-section-title">Live Stream</h2>
           {!activityLoading && activity.length > 0 && (
             <span className="text-xs text-gray-400">{activity.length} events</span>
           )}

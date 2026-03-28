@@ -11,11 +11,11 @@ import {
 import { assets } from "../assets/assets.js";
 
 const navItems = [
-  { to: "/add-song", icon: PlusCircle, label: "Add Song" },
-  { to: "/list-song", icon: Music, label: "All Songs" },
-  { to: "/add-album", icon: Library, label: "Add Album" },
-  { to: "/list-album", icon: Disc, label: "All Albums" },
-  { to: "/analytics", icon: BarChart3, label: "Analytics" },
+  { to: "/add-song", icon: PlusCircle, label: "New Track" },
+  { to: "/list-song", icon: Music, label: "Music Library" },
+  { to: "/add-album", icon: Library, label: "New Album" },
+  { to: "/list-album", icon: Disc, label: "Collections" },
+  { to: "/analytics", icon: BarChart3, label: "Impact" },
 ];
 
 const SideBar = () => {

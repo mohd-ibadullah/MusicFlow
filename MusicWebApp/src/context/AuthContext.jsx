@@ -51,6 +51,33 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus();
   }, []);
 
+  // Cross-tab auth synchronization via storage events
+  useEffect(() => {
+    const handleStorageChange = async (e) => {
+      if (e.key !== 'token') return;
+
+      if (!e.newValue) {
+        // Token was removed in another tab → log out here too
+        delete axios.defaults.headers.common['Authorization'];
+        setUser(null);
+      } else {
+        // Token was set in another tab → verify and sync
+        axios.defaults.headers.common['Authorization'] = `Bearer ${e.newValue}`;
+        try {
+          const response = await axios.get(`${API_BASE_URL}/api/auth/profile`);
+          if (response.data.success) {
+            setUser(response.data.data.user);
+          }
+        } catch {
+          setUser(null);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const signup = async ({ name, email, password }) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/auth/register`, {

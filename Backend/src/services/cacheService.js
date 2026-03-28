@@ -16,32 +16,28 @@ export const CACHE_KEYS = {
  * called only on add/remove/update, not on every play/like.
  */
 export const invalidateSongStructuralCaches = async () => {
-  console.log(`[CACHE] Invalidating structural song lists...`);
   const client = getRedisClient();
   if (!isRedisAvailable()) return;
-  const keys = await client.keys("songs:*");
-  if (keys.length > 0) await client.del(keys);
+  try {
+    const keys = await client.keys("songs:*");
+    if (keys.length > 0) await client.del(keys);
+  } catch (err) {
+    console.warn("[CACHE] Structural invalidation error:", err.message);
+  }
 };
 
 /**
  * Get cached JSON value. Fallback to null on miss or error.
  */
 export const cacheGet = async (key) => {
-  if (!isRedisAvailable()) {
-    console.log(`[CACHE] EXCLUDED (Redis unavailable) -> ${key}`);
-    return null;
-  }
+  if (!isRedisAvailable()) return null;
   try {
     const client = getRedisClient();
     const raw = await client.get(key);
-    if (raw) {
-      console.log(`[CACHE] HIT -> ${key}`);
-      return JSON.parse(raw);
-    }
-    console.log(`[CACHE] MISS -> fetching DB -> ${key}`);
+    if (raw) return JSON.parse(raw);
     return null;
   } catch (err) {
-    console.warn(`[CACHE] ERROR reading ${key}:`, err.message);
+    console.warn(`[CACHE] Read error for ${key}:`, err.message);
     return null;
   }
 };
@@ -55,9 +51,8 @@ export const cacheSet = async (key, value, ttlSeconds = DEFAULT_TTL) => {
     const client = getRedisClient();
     const serialized = JSON.stringify(value);
     await client.setEx(key, ttlSeconds, serialized);
-    console.log(`[CACHE] SET -> ${key} (TTL: ${ttlSeconds}s)`);
   } catch (err) {
-    console.warn(`[CACHE] ERROR setting ${key}:`, err.message);
+    console.warn(`[CACHE] Write error for ${key}:`, err.message);
   }
 };
 
@@ -69,9 +64,8 @@ export const cacheDel = async (key) => {
   try {
     const client = getRedisClient();
     await client.del(key);
-    console.log(`[CACHE] INVALIDATED EXACT -> ${key}`);
   } catch (err) {
-    console.warn(`[CACHE] ERROR deleting ${key}:`, err.message);
+    console.warn(`[CACHE] Delete error for ${key}:`, err.message);
   }
 };
 
@@ -85,12 +79,9 @@ export const cacheInvalidatePattern = async (pattern) => {
     const keys = await client.keys(pattern);
     if (keys && keys.length > 0) {
       await client.del(keys);
-      console.log(`[CACHE] INVALIDATED PATTERN -> ${pattern} (Cleared ${keys.length} keys)`);
-    } else {
-      console.log(`[CACHE] INVALIDATED PATTERN -> ${pattern} (No keys found)`);
     }
   } catch (err) {
-    console.warn(`[CACHE] ERROR invalidating pattern ${pattern}:`, err.message);
+    console.warn(`[CACHE] Pattern invalidation error for ${pattern}:`, err.message);
   }
 };
 
@@ -98,7 +89,6 @@ export const cacheInvalidatePattern = async (pattern) => {
  * Fully purge all cached song queries. Use strictly after mutations.
  */
 export const clearSongCaches = async () => {
-  console.log(`[CACHE] Initiating global song cache purge...`);
   await cacheInvalidatePattern("songs:*");
 };
 
@@ -106,7 +96,6 @@ export const clearSongCaches = async () => {
  * Fully purge all cached album queries. Use strictly after mutations.
  */
 export const clearAlbumCaches = async () => {
-  console.log(`[CACHE] Initiating global album cache purge...`);
   await cacheInvalidatePattern("albums:*");
 };
 
@@ -121,7 +110,7 @@ export const cachePushLiveEvent = async (eventPayload) => {
     await client.lPush(CACHE_KEYS.RECENT_LIVE_EVENTS, serialized);
     await client.lTrim(CACHE_KEYS.RECENT_LIVE_EVENTS, 0, 4); // Keep last 5 globally
   } catch (err) {
-    console.warn(`[CACHE] ERROR pushing live event:`, err.message);
+    console.warn("[CACHE] Live event push error:", err.message);
   }
 };
 
@@ -135,7 +124,7 @@ export const cacheGetLiveEvents = async () => {
     const rawList = await client.lRange(CACHE_KEYS.RECENT_LIVE_EVENTS, 0, 4);
     return rawList.map(item => JSON.parse(item));
   } catch (err) {
-    console.warn(`[CACHE] ERROR reading live events:`, err.message);
+    console.warn("[CACHE] Live events read error:", err.message);
     return [];
   }
 };

@@ -10,7 +10,6 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const envPath = path.resolve(__dirname, "../.env");
-console.log("ℹ️ loading env from", envPath);
 dotenv.config({ path: envPath });
 
 // Fail fast if required secrets are missing
@@ -129,7 +128,6 @@ for (const p of CANDIDATE_FRONTEND_PATHS) {
 }
 
 if (resolvedFrontendPath) {
-  console.log("🗂️ Serving static frontend from:", resolvedFrontendPath);
   app.use(express.static(resolvedFrontendPath));
   // SPA fallback (after API routes) using regex to exclude /api (Express 5 safe)
   app.get(/^\/(?!api)(.*)/, (req, res) => {
@@ -139,12 +137,7 @@ if (resolvedFrontendPath) {
   console.warn(
     "⚠️ Frontend build not found. Set FRONTEND_DIST or run 'npm run build:client' from the Backend folder to copy the client dist.",
   );
-} else {
-  // in development we don't require a build, frontend runs separately
-  console.log(
-    "ℹ️ Frontend static not configured; run the React dev server instead.",
-  );
-}
+} // End of static serving logic
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -191,7 +184,6 @@ setTimeout(async () => {
       const keys = await client.keys('user_sockets:*');
       if (keys.length > 0) await client.del(keys);
       await client.del('active_users');
-      console.log("🧹 Cleared stale socket sessions from Redis");
     } catch (e) {
       console.warn("Failed to clean Redis socket keys:", e.message);
     }

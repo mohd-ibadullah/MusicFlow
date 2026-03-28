@@ -20,7 +20,7 @@ const rebuildSongCaches = async () => {
     await cacheSet(CACHE_KEYS.TRENDING(limit), { data: trendingSongs, count: trendingSongs.length }, 60);
 
     // 3. User personalized recommendations are inherently cleared and lazily loaded on exact request
-    console.log(`[CACHE] Background write-through rebuilt global master lists ⚡`);
+    // Rebuild complete
   } catch (err) {
     console.warn(`[CACHE] Rebuild error:`, err.message);
   }
@@ -483,8 +483,6 @@ export const addToRecentlyPlayed = async (req, res) => {
   }
 
   try {
-    console.log("[RecentlyPlayed] Adding song:", songId, "for user:", userId);
-    
     // Validate ObjectId formats to prevent casting errors
     if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(songId)) {
       console.error("[RecentlyPlayed] Invalid ID format detected");
@@ -513,7 +511,6 @@ export const addToRecentlyPlayed = async (req, res) => {
       { _id: userObjectId },
       { $pull: { recentlyPlayed: { song: songObjectId } } }
     );
-    console.log("[RecentlyPlayed] Pull result:", pullResult.modifiedCount);
 
     // 2. Add song to top and trim to 5 items atomically
     const updatedUser = await User.findByIdAndUpdate(

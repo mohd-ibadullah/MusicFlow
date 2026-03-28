@@ -24,13 +24,13 @@ const connectRedis = async () => {
   if (redisClient) return redisClient;
 
   if (process.env.REDIS_ENABLED === 'false') {
-    console.log("ℹ️ Redis caching disabled via REDIS_ENABLED=false");
+    // Redis caching explicitly disabled
     return null;
   }
 
   const url = getRedisUrl();
   if (!url) {
-    console.log("ℹ️ Redis not configured; skipping connection.");
+    // No Redis URL configured; running without cache
     return null;
   }
 
@@ -54,7 +54,7 @@ const connectRedis = async () => {
       redisAvailable = false;
     });
     redisClient.on("connect", () => {
-      console.log("✅ Redis connected");
+      console.log("✅ Redis connected"); // Single essential startup log
       redisAvailable = true;
     });
 

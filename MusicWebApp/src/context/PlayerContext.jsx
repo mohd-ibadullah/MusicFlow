@@ -1220,13 +1220,11 @@ const PlayerContextProvider = (props) => {
 
         socket.on("connect", () => {
           isSocketConnectedRef.current = true;
-          console.log("[Socket] Connected - fetching initial listener count");
           socket.emit("get_listeners");
         });
 
         socket.on("disconnect", () => {
           isSocketConnectedRef.current = false;
-          console.log("[Socket] Disconnected");
         });
 
         socket.on("connect_error", (err) => {
@@ -1234,19 +1232,16 @@ const PlayerContextProvider = (props) => {
         });
 
         socket.on("user_listening", (payload) => {
-          console.log("[Socket] Received user_listening:", payload);
           setLiveListening((prev) => {
             const next = [
               { ...payload, at: Date.now() },
               ...(prev || []),
             ].slice(0, 5);
-            console.log("[Socket] Updated liveListening:", next);
             return next;
           });
         });
 
         socket.on("recent_live_events", (eventsPayload) => {
-          console.log("[Socket] Restoring recent live activity from cache");
           if (Array.isArray(eventsPayload)) {
             setLiveListening(eventsPayload.map(e => ({ ...e, at: Date.now() })));
           }
@@ -1457,7 +1452,7 @@ const PlayerContextProvider = (props) => {
                 axios.post(`${url}/api/song/play/${currentTrack._id}`, {
                   listenerId: listenerIdRef.current,
                   userName: userRef.current?.name || "Anonymous",
-                }).catch(err => console.debug("Play count error:", err.message));
+                }).catch(() => {});
               }
             }
           };

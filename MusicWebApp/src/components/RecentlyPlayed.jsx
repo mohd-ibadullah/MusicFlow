@@ -90,9 +90,9 @@ const RecentlyPlayed = () => {
             </svg>
           </button>
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">Recently Played</h1>
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">Jump back in</h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">
-              {filteredRecentlyPlayed.length} {filteredRecentlyPlayed.length === 1 ? 'song' : 'songs'} you've played recently
+              {filteredRecentlyPlayed.length} {filteredRecentlyPlayed.length === 1 ? 'track' : 'tracks'} you've relived lately
             </p>
           </div>
         </div>

@@ -27,11 +27,6 @@ const DisplayHome = () => {
     playWithId
   } = usePlayer();
 
-  // Debug: log liveListening changes
-  React.useEffect(() => {
-    console.log("[DisplayHome] liveListening updated:", liveListening);
-  }, [liveListening]);
-
   const [isLoading, setIsLoading] = useState(false);
 
   const [sectionPages, setSectionPages] = useState({
@@ -359,7 +354,7 @@ const DisplayHome = () => {
       {/* Recommended For You */}
       {hasData.recommendations && (
         <CarouselSection
-          title="Recommended For You"
+          title="Made for you"
           items={recommendations}
           totalCount={recommendations.length}
           seeAllRoute="/songs/recommended"
@@ -371,7 +366,7 @@ const DisplayHome = () => {
       {/* Trending Now */}
       {hasData.trending && (
         <CarouselSection
-          title="Trending Now"
+          title="What's hot right now"
           items={trendingSongs.slice(0, TRENDING_HOME_LIMIT)}
           totalCount={trendingSongs.length}
           seeAllRoute="/songs/trending"
@@ -383,7 +378,7 @@ const DisplayHome = () => {
       {/* Recently Played */}
       {hasData.recentlyPlayed && (
         <CarouselSection
-          title="Recently Played"
+          title="Jump back in"
           items={recentlyPlayed}
           totalCount={recentlyPlayed.length}
           seeAllRoute="/songs/recent"
@@ -417,7 +412,7 @@ const DisplayHome = () => {
             <div className="absolute inset-0 bg-blue-500 opacity-90"></div>
             <div className="relative z-10">
               <Heart className="w-10 h-10 mb-3 text-white" aria-hidden />
-              <h3 className="font-bold text-xl mb-2">Liked Songs</h3>
+              <h3 className="font-bold text-xl mb-2">Liked by you</h3>
               <p className="text-blue-100 text-sm">
                 {hasData.likedSongs ? `${likedSongs.length} songs` : 'Like songs to see them here'}
               </p>
@@ -500,7 +495,7 @@ const DisplayHome = () => {
           </section>
         ) : (
           <CarouselSection
-            title="Featured Charts"
+            title="Today's top charts"
             items={albumsData}
             totalCount={albumsData.length}
             seeAllRoute="/albums"
@@ -520,7 +515,7 @@ const DisplayHome = () => {
       {/* Today's Biggest Hits */}
       {hasData.biggestHits && (
         <CarouselSection
-          title="Today's Biggest Hits"
+          title="All-time favorites"
           items={biggestHitsSongs}
           totalCount={biggestHitsSongs.length}
           seeAllRoute="/songs/biggest-hits"
@@ -532,7 +527,7 @@ const DisplayHome = () => {
       {/* Your Playlists */}
       {hasData.playlists && (
         <CarouselSection
-          title="Your Playlists"
+          title="Your collection"
           items={playlists}
           totalCount={playlists.length}
           seeAllRoute="/playlists"
