@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ThemeContext';
 
 const Signup = () => {
+  const navigate = useNavigate();
   const { signup, isAuthenticated } = useAuth();
   const { showToast } = useToast();
-  const navigate = useNavigate();
-
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Navigate when authentication state changes
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/');
@@ -22,11 +21,14 @@ const Signup = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      showToast('Please fill in all fields', 'info');
+      return;
+    }
     setLoading(true);
     try {
       await signup({ name, email, password });
-      showToast('Account created', 'success');
-      // Navigation will be handled by useEffect when isAuthenticated changes
+      showToast('Account created successfully!', 'success');
     } catch (err) {
       showToast(err.message || 'Signup failed', 'error');
     } finally {
@@ -35,40 +37,84 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <div className="w-full max-w-md p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Create account</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Sign up to save your likes and playlists in your account</p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input 
-            className="w-full p-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400" 
-            placeholder="Full name" 
-            value={name} 
-            onChange={(e)=>setName(e.target.value)}
-            minLength="2"
-            maxLength="50"
-            required
-          />
-          <input 
-            className="w-full p-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400" 
-            placeholder="Email" 
-            type="email"
-            value={email} 
-            onChange={(e)=>setEmail(e.target.value)}
-            required
-          />
-          <input 
-            type="password" 
-            className="w-full p-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400" 
-            placeholder="Password (min 6 characters)" 
-            value={password} 
-            onChange={(e)=>setPassword(e.target.value)}
-            minLength="6"
-            required
-          />
-          <button disabled={loading} className="w-full py-3 btn-primary rounded-xl">{loading ? 'Creating...' : 'Create account'}</button>
-        </form>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">Already have an account? <Link to="/login" className="text-blue-600">Sign in</Link></p>
+    <div className="min-h-screen flex flex-col items-center py-20 px-4 bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0] overflow-y-auto">
+      <div className="w-full max-w-lg animate-fade-in relative z-10 py-10">
+        {/* Branding - Spaced out */}
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-500/20 font-inter text-white">
+            <span className="font-bold text-4xl leading-none">M</span>
+          </div>
+          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">MusicFlow</h1>
+          <p className="text-slate-700 mt-4 font-semibold text-sm uppercase tracking-[0.3em]">Join the rhythm</p>
+        </div>
+
+        {/* Signup Card - Spacious and Light */}
+        <div className="glass p-8 sm:p-12 rounded-[2.5rem] bg-white border border-slate-200">
+          <h2 className="text-3xl font-bold text-slate-800 mb-8 flex items-center justify-center gap-4">
+            <UserPlus className="w-7 h-7 text-blue-600" />
+            Create account
+          </h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-1">Full Name</label>
+              <input 
+                className="input-field" 
+                placeholder="John Doe" 
+                value={name} 
+                onChange={(e)=>setName(e.target.value)} 
+                required
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-1">Email address</label>
+              <input 
+                className="input-field" 
+                placeholder="yours@example.com" 
+                type="email"
+                value={email} 
+                onChange={(e)=>setEmail(e.target.value)} 
+                required
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-1">Secret Password</label>
+              <input 
+                type="password" 
+                className="input-field" 
+                placeholder="Min. 8 characters" 
+                value={password} 
+                onChange={(e)=>setPassword(e.target.value)} 
+                required
+              />
+            </div>
+
+            <button 
+              disabled={loading} 
+              className="w-full py-5 btn-primary rounded-2xl flex items-center justify-center gap-3 text-lg font-bold mt-10 shadow-lg shadow-blue-500/20"
+            >
+              {loading ? (
+                <>
+                  <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                  Creating account...
+                </>
+              ) : 'Get Started'}
+            </button>
+          </form>
+
+          <p className="text-center text-slate-600 mt-10 text-base font-medium">
+            Already have an account? <Link to="/login" className="text-blue-600 font-bold hover:text-blue-500 transition-colors ml-1">Sign in</Link>
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-12">
+          <p className="text-[11px] text-slate-600 font-bold uppercase tracking-[0.4em]">
+            Secure Full-Stack Streaming
+          </p>
+        </div>
       </div>
     </div>
   );

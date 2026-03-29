@@ -15,7 +15,7 @@ const DisplayAlbum = ({ album }) => {
 
   useEffect(() => {
     let foundAlbum = null;
-    
+
     if (album) {
       foundAlbum = album;
     } else if (albumsData.length > 0 && id) {
@@ -27,7 +27,7 @@ const DisplayAlbum = ({ album }) => {
     } else {
       showToast("Album not found", "error");
     }
-    
+
     setLoading(false);
   }, [albumsData, id, album, showToast]);
 
@@ -103,10 +103,10 @@ const DisplayAlbum = ({ album }) => {
     <div className="animate-fade-in">
       {/* Album Header */}
       <div className="flex gap-8 flex-col md:flex-row md:items-end mb-12">
-        <img 
-          className="w-48 h-48 rounded-2xl shadow-2xl object-cover" 
-          src={safeAlbumData.image} 
-          alt={safeAlbumData.name} 
+        <img
+          className="w-48 h-48 rounded-2xl shadow-2xl object-cover"
+          src={safeAlbumData.image}
+          alt={safeAlbumData.name}
         />
         <div className="flex flex-col flex-1 min-w-0 w-full">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">ALBUM</p>
@@ -126,17 +126,16 @@ const DisplayAlbum = ({ album }) => {
               {albumSongs.length} {albumSongs.length === 1 ? 'song' : 'songs'}
             </span>
           </div>
-          
+
           {/* Album Actions */}
           <div className="flex gap-4 mt-6">
             <button
               onClick={handlePlayAlbum}
               disabled={albumSongs.length === 0}
-              className={`h-10 px-6 flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 shadow-md ${
-                albumSongs.length > 0 
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+              className={`h-10 px-6 flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 shadow-md ${albumSongs.length > 0
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
                   : 'bg-gray-400 dark:bg-gray-600 text-gray-200 opacity-50 cursor-not-allowed'
-              }`}
+                }`}
             >
               {albumSongs.length > 0 ? 'Play Album' : 'No Songs'}
             </button>
@@ -160,7 +159,7 @@ const DisplayAlbum = ({ album }) => {
             <div className="col-span-3 hidden md:block">Album</div>
             <div className="col-span-2 text-center">Duration</div>
           </div>
-          
+
           {/* Songs */}
           {albumSongs.map((item, index) => {
             const isCurrent = isCurrentSong(item._id);
@@ -169,11 +168,10 @@ const DisplayAlbum = ({ album }) => {
               <div
                 key={item._id || index}
                 onClick={() => handlePlaySong(item._id)}
-                className={`grid grid-cols-12 gap-4 p-6 items-center cursor-pointer transition-colors duration-200 group ${
-                  isCurrent
+                className={`grid grid-cols-12 gap-4 p-6 items-center cursor-pointer transition-colors duration-200 group ${isCurrent
                     ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-                }`}
+                  }`}
               >
                 <div className="col-span-1 flex items-center justify-center">
                   {isCurrent ? (

@@ -21,7 +21,7 @@ const Display = ({ onOpenMobileSidebar }) => {
   const { albumsData } = usePlayer();
   const displayRef = useRef();
   const location = useLocation();
-  
+
   const isAlbum = location.pathname.includes("/album/");
   const albumId = isAlbum ? location.pathname.split("/").pop() : "";
   const album = isAlbum ? albumsData.find((x) => x && x._id === albumId) : null;
@@ -61,9 +61,9 @@ const Display = ({ onOpenMobileSidebar }) => {
             <Route path="/recommended" element={<RecommendedSongsPage />} />
             <Route path="/albums" element={<AllAlbums />} />
             <Route path="/playlists" element={<DisplayPlaylists />} />
-            <Route 
-              path="/album/:id" 
-              element={<DisplayAlbum album={album} />} 
+            <Route
+              path="/album/:id"
+              element={<DisplayAlbum album={album} />}
             />
             <Route path="/playlist/:id" element={<DisplayPlaylist />} />
           </Routes>

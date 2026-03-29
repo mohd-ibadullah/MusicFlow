@@ -16,15 +16,22 @@ body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  background: #f8fafc;
+  transition: background 0.3s ease;
+}
+
+body.dark {
+  background: #0f172a;
 }
 
 /* ===== DESIGN TOKENS ===== */
 :root {
   --color-primary: 59 130 245;
   --color-primary-hover: 37 99 235;
-  --radius-btn: 0.5rem;
-  --radius-card-lg: 0.75rem;
-  --radius-card-xl: 1rem;
+  --radius-btn: 0.75rem;
+  --radius-card-lg: 1.5rem;
+  --radius-card-xl: 2rem;
+  --radius-premium: 2.5rem;
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -82,10 +89,10 @@ body {
 
   /* ===== INPUTS ===== */
   .input-admin {
-    @apply w-full px-4 py-2.5 rounded-lg text-sm text-gray-900 bg-white;
-    @apply border border-gray-200 placeholder-gray-400;
+    @apply w-full px-5 py-4 rounded-xl text-sm text-gray-900 bg-[#f1f5f9];
+    @apply border border-[#e2e8f0] placeholder-gray-400;
     @apply outline-none transition-all duration-200;
-    @apply focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20;
+    @apply focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10;
   }
 
   .select-admin {
@@ -101,17 +108,12 @@ body {
 
   /* ===== CARDS ===== */
   .card-admin {
-    @apply bg-white rounded-xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.02),0_1px_2px_rgba(0,0,0,0.04)];
-    @apply transition-all duration-200;
+    @apply bg-white rounded-3xl border border-slate-100 shadow-sm transition-all duration-300;
+    @apply hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-50;
   }
   
   .card-admin-alt {
-    @apply bg-white rounded-2xl border border-gray-200/60 shadow-[0_2px_4px_rgba(0,0,0,0.03)];
-    @apply transition-all duration-200;
-  }
-
-  .card-admin-hover {
-    @apply card-admin hover:shadow-md hover:border-gray-200;
+    @apply bg-white rounded-[2rem] border border-slate-200 shadow-sm transition-all duration-300;
   }
 
   /* ===== STAT CARDS ===== */
@@ -146,13 +148,19 @@ body {
   .badge-orange { @apply badge bg-orange-50 text-orange-700; }
   .badge-red { @apply badge bg-red-50 text-red-700; }
 
-  /* ===== SIDEBAR ===== */
-  .sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200;
-    @apply text-gray-400 hover:text-white hover:bg-white/10;
+  /* ===== GLASSMORPHISM ===== */
+  .glass {
+    background: white;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
   }
-  .sidebar-link.active {
-    @apply text-white bg-blue-600/20 border-l-4 border-blue-500 shadow-sm;
+
+  /* ===== SPECIAL BUTTONS ===== */
+  .btn-premium {
+    @apply px-6 py-4 rounded-xl font-bold transition-all duration-300;
+    @apply bg-blue-600 text-white shadow-lg shadow-blue-500/20;
+    @apply hover:bg-blue-500 hover:shadow-blue-500/30 hover:-translate-y-0.5;
+    @apply active:scale-[0.98] active:translate-y-0;
   }
 }
 
