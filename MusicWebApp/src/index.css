@@ -495,17 +495,22 @@ select:focus-visible {
 }
 
 .input-field {
-  @apply w-full px-5 py-4 rounded-xl text-gray-900 outline-none transition-all duration-300;
+  @apply w-full px-5 py-4 rounded-xl text-slate-900 dark:text-slate-100 outline-none transition-all duration-300;
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
 }
 
+.dark .input-field {
+  background: #1e293b;
+  border: 1px solid #334155;
+}
+
 .input-field:focus {
-  @apply ring-4 ring-blue-500/10 border-blue-400 bg-white shadow-sm;
+  @apply ring-4 ring-blue-500/10 border-blue-400 bg-white dark:bg-slate-800 shadow-sm dark:border-blue-500;
 }
 
 .input-field::placeholder {
-  @apply text-gray-400 font-medium;
+  @apply text-slate-400 font-medium;
 }
 
 /* Quick access / premium cards */

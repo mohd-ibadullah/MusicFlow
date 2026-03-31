@@ -59,7 +59,7 @@ const AdminLogin = () => {
         </div>
 
         {/* Card - Spacious and Light */}
-        <div className="glass p-8 sm:p-12 rounded-[2.5rem] bg-white border border-slate-200">
+        <div className="glass p-8 sm:p-12 rounded-[2.5rem] bg-white border border-slate-200 ">
           <h2 className="text-3xl font-bold text-slate-800 mb-8 flex items-center justify-center gap-4">
             <Lock className="w-7 h-7 text-blue-600" />
             Security Shield

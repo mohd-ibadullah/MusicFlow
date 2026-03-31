@@ -19,7 +19,7 @@ const AppContent = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 transition-all duration-300 font-inter overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-slate-50 transition-all duration-300 font-inter overflow-x-hidden">
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
         <main className="flex-1 flex flex-col min-w-0 min-h-0">

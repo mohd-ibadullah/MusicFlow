@@ -60,18 +60,20 @@ const DisplayPlaylist = () => {
   };
 
   const handleRemoveSong = async (songId) => {
-    const result = await removeSongFromPlaylist(id, songId);
-    if (result.success) {
-      // Update local state immediately for reactive rendering
-      setPlaylist(prevPlaylist => ({
-        ...prevPlaylist,
-        songs: prevPlaylist.songs.filter(song => song._id !== songId)
-      }));
-      // Toast is already shown by removeSongFromPlaylist function
-    } else {
-      showToast("Failed to remove song", "error");
-    }
+    // Close modal immediately for smooth UI transition without flicker
     setShowRemoveSong(null);
+
+    // Update local state immediately for reactive rendering
+    setPlaylist(prevPlaylist => ({
+      ...prevPlaylist,
+      songs: prevPlaylist.songs.filter(song => song._id !== songId)
+    }));
+
+    const result = await removeSongFromPlaylist(id, songId);
+    if (!result.success) {
+      showToast("Failed to remove song", "error");
+      // Could re-fetch getPlaylistData() here if we want to rollback
+    }
   };
 
   const handlePlayPlaylist = () => {

@@ -29,9 +29,9 @@ const Display = ({ onOpenMobileSidebar }) => {
   useEffect(() => {
     if (displayRef.current) {
       if (isAlbum && album) {
-        displayRef.current.style.background = `linear-gradient(135deg, ${album.bgColor}20, transparent)`;
+        displayRef.current.style.backgroundImage = `linear-gradient(135deg, ${album.bgColor}20, transparent)`;
       } else {
-        displayRef.current.style.background = `transparent`;
+        displayRef.current.style.backgroundImage = `none`;
       }
     }
   }, [isAlbum, album]);
