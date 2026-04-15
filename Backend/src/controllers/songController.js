@@ -1,11 +1,22 @@
+import crypto from "crypto";
 import mongoose from "mongoose";
 import Song from "../models/songModel.js";
 import User from "../models/userModel.js";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
-import { cacheGet, cacheSet, CACHE_KEYS, invalidateSongStructuralCaches, cachePushLiveEvent } from "../services/cacheService.js";
+import { cacheGet, cacheSet, cacheDel, CACHE_KEYS, invalidateSongStructuralCaches, cachePushLiveEvent } from "../services/cacheService.js";
 import * as songService from "../services/songService.js";
 import logActivity from "../utils/logActivity.js";
+import { getRedisClient } from "../config/redis.js";
+import { logAIInteraction } from "../ai/telemetryService.js";
+import { invalidateFeedbackCacheForUser } from "../ai/embeddingRecommender.js";
+import { sendServerError, sendValidationError } from "../utils/http.js";
+import { logger } from "../utils/logger.js";
+import { isValidObjectId } from "../utils/validation.js";
+import {
+  emitRealtimeFromReq,
+  REALTIME_EVENTS,
+} from "../socket/realtimeEvents.js";
 
 // Write-Through Cache Builder mechanism to eliminate null window after valid invalidation
 const rebuildSongCaches = async () => {
@@ -29,26 +40,43 @@ const rebuildSongCaches = async () => {
 // In-memory guard to prevent duplicate playCount increments and socket emits
 // Key: `${listenerId}-${songId}`, Value: timestamp of last play
 const lastPlayMap = new Map();
-// Set of keys currently being processed to prevent race conditions
-const processingPlays = new Set();
+// Key: `${listenerId}-${songId}`, Value: timestamp while processing
+const processingPlays = new Map();
+
+const PLAY_DEDUP_TTL_MS = 10000;
+const PLAY_PROCESSING_TTL_MS = 15000;
+const PLAY_MAP_MAX_SIZE = 20000;
+const LIKE_LOG_TTL_MS = 120000;
+const LIKE_MAP_MAX_SIZE = 10000;
+
+const pruneTimestampMap = (map, ttlMs, maxSize, now = Date.now()) => {
+  for (const [key, timestamp] of map.entries()) {
+    if (!Number.isFinite(timestamp) || now - timestamp > ttlMs) {
+      map.delete(key);
+    }
+  }
+
+  while (map.size > maxSize) {
+    const firstKey = map.keys().next().value;
+    if (!firstKey) break;
+    map.delete(firstKey);
+  }
+};
 
 // Deduplication map for like activity logs
 const lastLikeLogMap = new Map();
 const canProcessLikeLog = (userId, songId) => {
   const key = `${userId}-${songId}`;
   const now = Date.now();
+  pruneTimestampMap(lastLikeLogMap, LIKE_LOG_TTL_MS, LIKE_MAP_MAX_SIZE, now);
+
   // If liked within last 2 minutes, don't spam activity logs again
-  if (lastLikeLogMap.has(key) && now - lastLikeLogMap.get(key) < 120000) {
+  if (lastLikeLogMap.has(key) && now - lastLikeLogMap.get(key) < LIKE_LOG_TTL_MS) {
     return false;
   }
+
   lastLikeLogMap.set(key, now);
-  // Optional cleanup
-  if (Math.random() < 0.05) {
-    const cutoff = now - 300000;
-    for (const [k, ts] of lastLikeLogMap.entries()) {
-      if (ts < cutoff) lastLikeLogMap.delete(k);
-    }
-  }
+
   return true;
 };
 
@@ -56,6 +84,8 @@ const canProcessLikeLog = (userId, songId) => {
 const canProcessPlay = (listenerId, songId) => {
   const key = `${listenerId}-${songId}`;
   const now = Date.now();
+  pruneTimestampMap(lastPlayMap, PLAY_DEDUP_TTL_MS, PLAY_MAP_MAX_SIZE, now);
+  pruneTimestampMap(processingPlays, PLAY_PROCESSING_TTL_MS, PLAY_MAP_MAX_SIZE, now);
 
   // If already processing, reject duplicate
   if (processingPlays.has(key)) {
@@ -63,31 +93,26 @@ const canProcessPlay = (listenerId, songId) => {
   }
 
   // If played within last 10 seconds, reject duplicate
-  if (lastPlayMap.has(key) && now - lastPlayMap.get(key) < 10000) {
+  if (lastPlayMap.has(key) && now - lastPlayMap.get(key) < PLAY_DEDUP_TTL_MS) {
     return false;
   }
 
   // Reserve this key for processing
-  processingPlays.add(key);
+  processingPlays.set(key, now);
   return true;
 };
 
 // Record that a play has been processed (call after successful increment)
 const recordPlayProcessed = (listenerId, songId, success = true) => {
   const key = `${listenerId}-${songId}`;
+  const now = Date.now();
   processingPlays.delete(key);
   if (success) {
-    lastPlayMap.set(key, Date.now());
+    lastPlayMap.set(key, now);
   }
-  // Clean up old entries periodically (optional, but good for memory)
-  if (Math.random() < 0.01) {
-    const cutoff = Date.now() - 30000;
-    for (const [k, timestamp] of lastPlayMap.entries()) {
-      if (timestamp < cutoff) {
-        lastPlayMap.delete(k);
-      }
-    }
-  }
+
+  pruneTimestampMap(lastPlayMap, PLAY_DEDUP_TTL_MS, PLAY_MAP_MAX_SIZE, now);
+  pruneTimestampMap(processingPlays, PLAY_PROCESSING_TTL_MS, PLAY_MAP_MAX_SIZE, now);
 };
 
 export const addSong = async (req, res) => {
@@ -125,7 +150,7 @@ export const addSong = async (req, res) => {
         resource_type: "video",
       });
     } catch (cloudinaryError) {
-      console.error("❌ Cloudinary upload error:", cloudinaryError);
+      logger.error("Cloudinary upload error", { error: cloudinaryError.message });
       return res.status(400).json({
         success: false,
         message: "File upload failed. Please check your files and try again.",
@@ -171,12 +196,24 @@ export const addSong = async (req, res) => {
       req,
     });
 
+    emitRealtimeFromReq(
+      req,
+      REALTIME_EVENTS.SONG_CREATED,
+      {
+        song,
+      },
+      {
+        source: "song_controller",
+        audience: "all",
+      }
+    );
+
     // Clean up temporary files
     try {
       fs.unlinkSync(imageFile);
       fs.unlinkSync(audioFile);
     } catch (cleanupError) {
-      console.warn("⚠️ Could not clean up temp files:", cleanupError.message);
+      logger.warn("Could not clean up temp files", { error: cleanupError.message });
     }
 
     return res.status(200).json({
@@ -185,7 +222,7 @@ export const addSong = async (req, res) => {
       song,
     });
   } catch (error) {
-    console.error("❌ Add song error:", error);
+    logger.error("Add song error", { error: error.message });
 
     // Clean up temp files on error
     try {
@@ -194,17 +231,12 @@ export const addSong = async (req, res) => {
       if (req.files?.["audio"]?.[0]?.path)
         fs.unlinkSync(req.files["audio"][0].path);
     } catch (cleanupError) {
-      console.warn(
-        "⚠️ Could not clean up temp files on error:",
-        cleanupError.message,
-      );
+      logger.warn("Could not clean up temp files on add song error", {
+        error: cleanupError.message,
+      });
     }
 
-    return res.status(500).json({
-      success: false,
-      message: "Error adding song to database",
-      error: error.message,
-    });
+    return sendServerError(res, "Error adding song to database", error);
   }
 };
 
@@ -282,7 +314,12 @@ export const listSong = async (req, res) => {
 
 export const removeSong = async (req, res) => {
   try {
-    const result = await Song.findByIdAndDelete(req.body.id);
+    const songId = req.body?.id?.toString?.() || "";
+    if (!isValidObjectId(songId)) {
+      return sendValidationError(res, "Invalid song id");
+    }
+
+    const result = await Song.findByIdAndDelete(songId);
     if (!result) {
       return res.status(404).json({
         success: false,
@@ -293,16 +330,35 @@ export const removeSong = async (req, res) => {
     // Structural change: Invalidate master lists and trending caches
     await invalidateSongStructuralCaches();
     rebuildSongCaches();
+
+    await logActivity({
+      type: "song_deleted",
+      message: `"${result.name}" was deleted`,
+      userId: req.user?.userId || null,
+      req,
+    });
+
+    emitRealtimeFromReq(
+      req,
+      REALTIME_EVENTS.SONG_DELETED,
+      {
+        songId: result._id?.toString?.() || songId,
+        songName: result.name,
+        artist: result.artist,
+      },
+      {
+        source: "song_controller",
+        audience: "all",
+      }
+    );
+
     res.status(200).json({
       success: true,
       message: "Song deleted successfully",
     });
   } catch (error) {
-    console.error("Remove song error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error deleting song",
-    });
+    logger.error("Remove song error", { error: error.message });
+    return sendServerError(res, "Error deleting song", error);
   }
 };
 
@@ -319,10 +375,11 @@ export const likeSong = async (req, res) => {
     }
 
     if (!songId) {
-      return res.status(400).json({
-        success: false,
-        message: "Song ID is required",
-      });
+      return sendValidationError(res, "Song ID is required");
+    }
+
+    if (!isValidObjectId(songId.toString())) {
+      return sendValidationError(res, "Invalid song id");
     }
 
     // Check if song exists
@@ -361,6 +418,24 @@ export const likeSong = async (req, res) => {
         });
       }
 
+      try {
+        await logAIInteraction({
+          userId,
+          songId,
+          interactionType: "like",
+          source: "song_like_endpoint",
+        });
+        invalidateFeedbackCacheForUser(userId);
+      } catch (error) {
+        console.warn("[AI] Like feedback logging failed:", error.message);
+      }
+
+      try {
+        await cacheDel(CACHE_KEYS.RECOMMENDATIONS(userId.toString()));
+      } catch (error) {
+        console.warn("[CACHE] Failed clearing recommendations cache after like:", error.message);
+      }
+
       // Statistics update: Skip global purge to avoid cache thrashing. 
       // Individual counters sync via TTL or next structural rebuild.
 
@@ -368,14 +443,35 @@ export const likeSong = async (req, res) => {
       try {
         const io = req.app?.get?.("io");
         if (io && updatedSong) {
-          io.emit("analytics_updated", {
-            type: "song_liked",
-            songId: updatedSong._id.toString(),
-            songName: updatedSong.name,
-            artist: updatedSong.artist,
-            likeCount: updatedSong.likeCount,
-            timestamp: new Date().toISOString()
-          });
+          emitRealtimeFromReq(
+            req,
+            REALTIME_EVENTS.SONG_LIKED,
+            {
+              userId: userId.toString(),
+              songId: updatedSong._id.toString(),
+              songName: updatedSong.name,
+              artist: updatedSong.artist,
+              likeCount: updatedSong.likeCount,
+            },
+            {
+              source: "song_controller",
+              audience: "user_admin",
+              userId: userId.toString(),
+              legacy: [
+                {
+                  name: "analytics_updated",
+                  payload: {
+                    type: "song_liked",
+                    songId: updatedSong._id.toString(),
+                    songName: updatedSong.name,
+                    artist: updatedSong.artist,
+                    likeCount: updatedSong.likeCount,
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+              ],
+            }
+          );
         }
       } catch (emitErr) {
         console.warn("Socket emit error in likeSong:", emitErr.message);
@@ -387,11 +483,8 @@ export const likeSong = async (req, res) => {
       message: "Song liked successfully",
     });
   } catch (error) {
-    console.error("Like song error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error liking song",
-    });
+    logger.error("Like song error", { error: error.message });
+    return sendServerError(res, "Error liking song", error);
   }
 };
 
@@ -408,10 +501,11 @@ export const unlikeSong = async (req, res) => {
     }
 
     if (!songId) {
-      return res.status(400).json({
-        success: false,
-        message: "Song ID is required",
-      });
+      return sendValidationError(res, "Song ID is required");
+    }
+
+    if (!isValidObjectId(songId.toString())) {
+      return sendValidationError(res, "Invalid song id");
     }
 
     // Remove song from user's liked songs atomically
@@ -433,18 +527,45 @@ export const unlikeSong = async (req, res) => {
         { $set: { likeCount: { $max: [{ $subtract: ["$likeCount", 1] }, 0] } } },
       ], { new: true });
 
+      try {
+        await cacheDel(CACHE_KEYS.RECOMMENDATIONS(userId.toString()));
+      } catch (error) {
+        console.warn("[CACHE] Failed clearing recommendations cache after unlike:", error.message);
+      }
+
       // Broadcast analytics update instantly
       try {
         const io = req.app?.get?.("io");
         if (io && updatedSong) {
-          io.emit("analytics_updated", {
-            type: "song_unliked",
-            songId: updatedSong._id.toString(),
-            songName: updatedSong.name,
-            artist: updatedSong.artist,
-            likeCount: updatedSong.likeCount,
-            timestamp: new Date().toISOString()
-          });
+          emitRealtimeFromReq(
+            req,
+            REALTIME_EVENTS.SONG_UNLIKED,
+            {
+              userId: userId.toString(),
+              songId: updatedSong._id.toString(),
+              songName: updatedSong.name,
+              artist: updatedSong.artist,
+              likeCount: updatedSong.likeCount,
+            },
+            {
+              source: "song_controller",
+              audience: "user_admin",
+              userId: userId.toString(),
+              legacy: [
+                {
+                  name: "analytics_updated",
+                  payload: {
+                    type: "song_unliked",
+                    songId: updatedSong._id.toString(),
+                    songName: updatedSong.name,
+                    artist: updatedSong.artist,
+                    likeCount: updatedSong.likeCount,
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+              ],
+            }
+          );
         }
       } catch (emitErr) {
         console.warn("Socket emit error in unlikeSong:", emitErr.message);
@@ -456,11 +577,8 @@ export const unlikeSong = async (req, res) => {
       message: "Song unliked successfully",
     });
   } catch (error) {
-    console.error("Unlike song error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error unliking song",
-    });
+    logger.error("Unlike song error", { error: error.message });
+    return sendServerError(res, "Error unliking song", error);
   }
 };
 
@@ -532,6 +650,12 @@ export const addToRecentlyPlayed = async (req, res) => {
         success: false,
         message: "User not found",
       });
+    }
+
+    try {
+      await cacheDel(CACHE_KEYS.RECOMMENDATIONS(userId.toString()));
+    } catch (error) {
+      console.warn("[CACHE] Failed clearing recommendations cache after recently played update:", error.message);
     }
 
     res.status(200).json({
@@ -719,16 +843,25 @@ export const getArtists = async (req, res) => {
 export const incrementPlayCount = async (req, res) => {
   try {
     const { songId } = req.params;
-    const { listenerId, userName } = req.body;
-    
-    // Fallback ID to ensure deduplicating for purely unauthenticated users missing a listenerId
-    const effectiveListenerId = listenerId || req.ip || "unknown-listener";
+    const rawDisplayName = typeof req.body?.userName === "string" ? req.body.userName.trim() : "";
+    const safeDisplayName = rawDisplayName.slice(0, 64) || "Anonymous";
+
+    const authUserId = req.user?.userId?.toString?.();
+    const trustedUserId = isValidObjectId(authUserId || "") ? authUserId : null;
+    const userAgent = req.headers?.["user-agent"] || "unknown-agent";
+    const anonFingerprint = crypto
+      .createHash("sha256")
+      .update(`${req.ip || "unknown-ip"}|${userAgent}`)
+      .digest("hex")
+      .slice(0, 24);
+    const effectiveListenerId = trustedUserId || `anon:${anonFingerprint}`;
 
     if (!songId) {
-      return res.status(400).json({
-        success: false,
-        message: "Song ID is required",
-      });
+      return sendValidationError(res, "Song ID is required");
+    }
+
+    if (!isValidObjectId(songId.toString())) {
+      return sendValidationError(res, "Invalid song id");
     }
 
     // Check if song exists
@@ -765,38 +898,105 @@ export const incrementPlayCount = async (req, res) => {
       try {
         const io = req.app?.get?.("io");
         if (io && updatedSong) {
-          
-          // Broadcast live listening UI event
           const eventPayload = {
             songId: updatedSong._id.toString(),
             songName: updatedSong.name,
-            userId: effectiveListenerId,
-            userName: userName || "Anonymous"
-          };
-          
-          io.emit("user_listening", eventPayload);
-          await cachePushLiveEvent(eventPayload);
-          
-          // Emit dashboard data updates
-          io.emit("analytics_updated", {
-            type: "song_played",
-            songId: updatedSong._id.toString(),
-            songName: updatedSong.name,
+            userId: trustedUserId || `anon:${anonFingerprint}`,
+            userName: trustedUserId ? (req.user?.name || safeDisplayName) : safeDisplayName,
             artist: updatedSong.artist,
-            timestamp: new Date().toISOString()
-          });
+            playCount: updatedSong.playCount,
+          };
+
+          emitRealtimeFromReq(
+            req,
+            REALTIME_EVENTS.SONG_PLAYED,
+            eventPayload,
+            {
+              source: "song_controller",
+              audience: "all",
+              legacy: [
+                { name: "user_listening", payload: eventPayload },
+                {
+                  name: "analytics_updated",
+                  payload: {
+                    type: "song_played",
+                    songId: updatedSong._id.toString(),
+                    songName: updatedSong.name,
+                    artist: updatedSong.artist,
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+              ],
+            }
+          );
+
+          emitRealtimeFromReq(
+            req,
+            REALTIME_EVENTS.LIVE_STREAM_ACTIVITY,
+            eventPayload,
+            {
+              source: "song_controller",
+              audience: "admin",
+            }
+          );
+
+          await cachePushLiveEvent(eventPayload);
 
           // Unconditionally persist to DB so "Recent Activity" doesn't disappear on refresh
+          const displayName = trustedUserId ? (req.user?.name || safeDisplayName) : safeDisplayName;
           await logActivity({
             type: "song_played",
-            message: `${userName || "Someone"} played "${updatedSong.name}" by ${updatedSong.artist}`,
+            message: `${displayName} played "${updatedSong.name}" by ${updatedSong.artist}`,
             userId: req.user?.userId || null, 
             req
           });
 
         }
       } catch (emitErr) {
-        console.warn("Socket emit error in incrementPlayCount:", emitErr.message);
+        logger.warn("Socket emit error in incrementPlayCount", { error: emitErr.message });
+      }
+
+      const derivedUserId = trustedUserId;
+
+      if (derivedUserId) {
+        logAIInteraction({
+          userId: derivedUserId,
+          songId: songId.toString(),
+          interactionType: "play",
+          source: "song_play_endpoint",
+        })
+          .then(() => {
+            invalidateFeedbackCacheForUser(derivedUserId);
+          })
+          .catch((error) => {
+            logger.warn("[AI] Play feedback logging failed", { error: error.message });
+          });
+      }
+
+      // [LD] Loop Diagnosis Engine hook - additive, non-blocking
+      if (process.env.LOOP_DIAGNOSIS_ENABLED === "true") {
+
+        if (derivedUserId) {
+          const redisClient = req.app?.get?.("redisClient") || getRedisClient();
+          const ioServer = req.app?.get?.("io");
+
+          import("../services/loopDiagnosis/loopDiagnosisEngine.js")
+            .then(({ handlePlayEvent }) =>
+              handlePlayEvent({
+                userId: derivedUserId,
+                songId: songId.toString(),
+                redisClient,
+                io: ioServer,
+              }).catch((err) =>
+                logger.error("[LD] Unhandled engine error", { error: err.message })
+              )
+            )
+            .catch((err) =>
+              logger.error("[LD] Failed to load loop diagnosis engine", { error: err.message })
+            );
+        } else {
+          logger.debug("[LD] Skipping loop diagnosis for anonymous play event");
+        }
       }
 
       playSuccess = true;
@@ -805,7 +1005,7 @@ export const incrementPlayCount = async (req, res) => {
         message: "Play count updated",
       });
     } catch (error) {
-      console.error("Increment play count error:", error);
+      logger.error("Increment play count error", { error: error.message });
       res.status(500).json({
         success: false,
         message: "Error updating play count",
@@ -814,7 +1014,7 @@ export const incrementPlayCount = async (req, res) => {
       recordPlayProcessed(effectiveListenerId, songId, playSuccess);
     }
   } catch (error) {
-    console.error("Increment play count error:", error);
+    logger.error("Increment play count error", { error: error.message });
     res.status(500).json({
       success: false,
       message: "Error updating play count",

@@ -93,7 +93,7 @@ const CarouselSection = ({
       </div>
       <div className="songs-grid">
         {pageItems.map((item, index) => (
-          <div key={item._id ?? startIndex + index}>
+          <div key={item._id ?? startIndex + index} className="overflow-visible">
             {renderItem(item, startIndex + index)}
           </div>
         ))}

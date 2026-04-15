@@ -1,11 +1,38 @@
 // components/DisplayPlaylist.jsx
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Play, Pause, Music2 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { usePlayer } from "../context/PlayerContext";
 import { useToast } from "../context/ThemeContext";
 import Tooltip from "./Tooltip";
+
+const sanitizeIntentLabel = (value) =>
+  `${value || ""}`
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getAIGeneratedDescription = (playlist) => {
+  const aiLabel = sanitizeIntentLabel(playlist?.aiIntentLabel);
+  if (aiLabel) {
+    return `AI-generated playlist for: ${aiLabel}`;
+  }
+
+  const prefix = "ai-generated playlist for:";
+  const description = `${playlist?.description || ""}`.trim();
+  if (description.toLowerCase().startsWith(prefix)) {
+    const derived = sanitizeIntentLabel(description.slice(prefix.length));
+    if (derived && derived.split(" ").length <= 3) {
+      return `AI-generated playlist for: ${derived}`;
+    }
+  }
+
+  return "AI-generated playlist for: personalized";
+};
 
 const DisplayPlaylist = () => {
   const { id } = useParams();
@@ -19,7 +46,7 @@ const DisplayPlaylist = () => {
     track,
     playStatus,
   } = usePlayer();
-  
+
   const { showToast } = useToast();
   const [playlist, setPlaylist] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -118,6 +145,21 @@ const DisplayPlaylist = () => {
     );
   }
 
+  const renderGlobalModal = (content) => {
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+      <div
+        className="fixed top-0 left-0 flex items-center justify-center p-4 animate-fade-in"
+        style={{ width: "100vw", height: "100dvh", zIndex: 2147483647 }}
+      >
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md"></div>
+        <div className="relative w-full max-w-md">{content}</div>
+      </div>,
+      document.body
+    );
+  };
+
   return (
     <div className="p-8 animate-fade-in">
       {/* Playlist Header */}
@@ -131,22 +173,23 @@ const DisplayPlaylist = () => {
             {playlist?.name || ""}
           </h1>
           <p className="text-gray-600 dark:text-gray-300 mb-2">
-            {playlist.description || "Your personalized playlist"}
+            {playlist?.isAIGenerated
+              ? getAIGeneratedDescription(playlist)
+              : playlist.description || "Your personalized playlist"}
           </p>
           <p className="text-gray-600 dark:text-gray-300">
             {playlist.songs?.length || 0} {playlist.songs?.length === 1 ? 'song' : 'songs'}
           </p>
-          
+
           {/* Playlist Actions */}
           <div className="flex gap-4 mt-6">
             <button
               onClick={handlePlayPlaylist}
               disabled={!playlist.songs || playlist.songs.length === 0}
-              className={`h-10 px-6 flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 shadow-md ${
-                playlist.songs?.length > 0 
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+              className={`h-10 px-6 flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 shadow-md ${playlist.songs?.length > 0
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
                   : 'bg-gray-400 dark:bg-gray-600 text-gray-200 opacity-50 cursor-not-allowed'
-              }`}
+                }`}
             >
               {playlist.songs?.length > 0 ? 'Play Playlist' : 'No Songs'}
             </button>
@@ -185,72 +228,71 @@ const DisplayPlaylist = () => {
               <div className="col-span-1 text-center">Duration</div>
               <div className="col-span-1 text-center">Actions</div>
             </div>
-            
+
             {playlist.songs.map((song, index) => {
               const isCurrent = track?._id === song._id;
               const isPlaying = isCurrent && playStatus;
               return (
-              <div
-                key={song._id}
-                className={`grid grid-cols-12 gap-4 p-3 rounded-lg transition-all group items-center ${
-                  isCurrent
-                    ? "bg-blue-50 dark:bg-blue-900/20"
-                    : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                }`}
-              >
-                <div className="col-span-1 text-center text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300">
-                  {isCurrent ? (
-                    isPlaying ? (
-                      <Pause className="w-4 h-4 text-blue-500 mx-auto" />
+                <div
+                  key={song._id}
+                  className={`grid grid-cols-12 gap-4 p-3 rounded-lg transition-all group items-center ${isCurrent
+                      ? "bg-blue-50 dark:bg-blue-900/20"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                >
+                  <div className="col-span-1 text-center text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300">
+                    {isCurrent ? (
+                      isPlaying ? (
+                        <Pause className="w-4 h-4 text-blue-500 mx-auto" />
+                      ) : (
+                        <Play className="w-4 h-4 text-blue-500 mx-auto" />
+                      )
                     ) : (
-                      <Play className="w-4 h-4 text-blue-500 mx-auto" />
-                    )
-                  ) : (
-                    index + 1
-                  )}
-                </div>
-                <div className="col-span-5 flex items-center gap-3">
-                  <img
-                    src={song.image}
-                    alt={song.name}
-                    className="w-12 h-12 rounded object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className={`font-medium truncate ${isCurrent ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"}`}>{song.name}</p>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm truncate">{song.desc}</p>
+                      index + 1
+                    )}
+                  </div>
+                  <div className="col-span-5 flex items-center gap-3">
+                    <img
+                      src={song.image}
+                      alt={song.name}
+                      className="w-12 h-12 rounded object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className={`font-medium truncate ${isCurrent ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"}`}>{song.name}</p>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm truncate">{song.desc}</p>
+                    </div>
+                  </div>
+                  <div className="col-span-4 text-gray-600 dark:text-gray-400 truncate">
+                    {song.album}
+                  </div>
+                  <div className="col-span-1 text-center text-gray-600 dark:text-gray-400 text-sm">
+                    {song.duration}
+                  </div>
+                  <div className="col-span-1 flex justify-center items-center gap-2">
+                    <Tooltip content={isPlaying ? "Pause" : "Play"} position="bottom">
+                      <button
+                        onClick={() => playWithId(song._id, playlist.songs)}
+                        className="flex items-center justify-center w-8 h-8 opacity-0 group-hover:opacity-100 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 shadow-sm"
+                      >
+                        {isPlaying ? (
+                          <Pause className="w-4 h-4 text-white" />
+                        ) : (
+                          <Play className="w-4 h-4 text-white ml-0.5" />
+                        )}
+                      </button>
+                    </Tooltip>
+                    <Tooltip content="Remove from playlist" position="bottom">
+                      <button
+                        onClick={() => setShowRemoveSong(song._id)}
+                        className="flex items-center justify-center w-8 h-8 opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 shadow-sm"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
-                <div className="col-span-4 text-gray-600 dark:text-gray-400 truncate">
-                  {song.album}
-                </div>
-                <div className="col-span-1 text-center text-gray-600 dark:text-gray-400 text-sm">
-                  {song.duration}
-                </div>
-                <div className="col-span-1 flex justify-center items-center gap-2">
-                  <Tooltip content={isPlaying ? "Pause" : "Play"} position="bottom">
-                    <button
-                      onClick={() => playWithId(song._id, playlist.songs)}
-                      className="flex items-center justify-center w-8 h-8 opacity-0 group-hover:opacity-100 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 shadow-sm"
-                    >
-                      {isPlaying ? (
-                        <Pause className="w-4 h-4 text-white" />
-                      ) : (
-                        <Play className="w-4 h-4 text-white ml-0.5" />
-                      )}
-                    </button>
-                  </Tooltip>
-                  <Tooltip content="Remove from playlist" position="bottom">
-                    <button
-                      onClick={() => setShowRemoveSong(song._id)}
-                      className="flex items-center justify-center w-8 h-8 opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 shadow-sm"
-                    >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </Tooltip>
-                </div>
-              </div>
               );
             })}
           </div>
@@ -258,12 +300,12 @@ const DisplayPlaylist = () => {
       </div>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-gray-700">
+      {showDeleteConfirm &&
+        renderGlobalModal(
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full shadow-xl border border-gray-200 dark:border-gray-700">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Delete Playlist</h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Are you sure you want to delete "<span className="font-bold">{playlist.name}</span>"? 
+              Are you sure you want to delete "<span className="font-bold">{playlist.name}</span>"?
               This action cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
@@ -281,13 +323,12 @@ const DisplayPlaylist = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Remove Song Confirmation Modal */}
-      {showRemoveSong && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-gray-700">
+      {showRemoveSong &&
+        renderGlobalModal(
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full shadow-xl border border-gray-200 dark:border-gray-700">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Remove Song</h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
               Are you sure you want to remove this song from the playlist?
@@ -307,8 +348,7 @@ const DisplayPlaylist = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 };

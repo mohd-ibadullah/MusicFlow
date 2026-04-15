@@ -57,6 +57,39 @@ const userSchema = new mongoose.Schema({
   lastLogin: {
     type: Date,
     default: Date.now
+  },
+  loopDiagnosisPrefs: {
+    reminderStyle: {
+      type: String,
+      enum: ["never", "light", "balanced", "strict"],
+      default: "balanced"
+    },
+    remindersMuted: {
+      type: Boolean,
+      default: false
+    },
+    quietHoursEnabled: {
+      type: Boolean,
+      default: false
+    },
+    quietHoursStart: {
+      type: Number,
+      min: 0,
+      max: 23,
+      default: 23
+    },
+    quietHoursEnd: {
+      type: Number,
+      min: 0,
+      max: 23,
+      default: 6
+    },
+    reminderCapPerDay: {
+      type: Number,
+      min: 1,
+      max: 12,
+      default: 4
+    }
   }
 }, {
   timestamps: true

@@ -28,6 +28,7 @@ This document covers **100% of the project** — every feature, every file, ever
 20. [Interview Questions & Answers (30+)](#20-interview-questions--answers)
 21. [What I'd Do Differently](#21-what-id-do-differently)
 22. [How to Talk About This Project](#22-how-to-talk-about-this-project)
+23. [April 2026 Addendum](#23-april-2026-addendum)
 
 ---
 
@@ -229,7 +230,7 @@ If Tab A logs out, Tab B immediately detects the localStorage change and clears 
 | **Password hashing** | bcrypt, salt rounds 12 | `userModel.js` |
 | **JWT tokens** | 7-day expiry, role-encoded | `authController.js` |
 | **HTTP headers** | Helmet (XSS, clickjacking, etc.) | `server.js` |
-| **Rate limiting** | 200 requests per 15 minutes per IP | `server.js` |
+| **Rate limiting** | Configurable via env; enabled in production, disabled by default in local dev | `server.js` |
 | **CORS** | Strict origin whitelist | `server.js` |
 | **Role-based auth** | `authorizeAdmin` middleware | `authMiddleware.js` |
 | **Soft delete** | `isActive` flag instead of hard delete | `userModel.js` |
@@ -451,27 +452,36 @@ Backend: `authorizeAdmin` middleware rejects any request where `req.user.role !=
 
 `POST /api/playlist/generate` with body `{ prompt: "relaxing evening music" }`
 
-**How it works** (no external AI API needed):
+**How it works** (LLM for intent extraction, DB-only retrieval):
 
-1. **Keyword extraction**: Strips common words, takes up to 10 keywords from the prompt.
-2. **Prompt-to-criteria mapping**: Pre-built dictionary maps common moods to genres:
+1. **Provider-normalized intent extraction**: Uses `LLM_PROVIDER` and supports OpenRouter, OpenAI, Anthropic, and Google Gemini.
+2. **Strict JSON intent schema**: Model output is constrained to:
    ```javascript
    {
-     workout: ["rock", "pop", "electronic", "hip hop", "dance", "energy", "upbeat"],
-     relaxing: ["jazz", "ambient", "acoustic", "chill", "calm", "peaceful"],
-     sad: ["ballad", "acoustic", "sad", "slow", "emotional"],
-     party: ["dance", "pop", "electronic", "party", "club"],
-     focus: ["ambient", "classical", "instrumental", "study"],
-     sleep: ["ambient", "calm", "soft", "piano"],
+     mood: "string",
+     energy: "low|medium|high|mixed",
+     vibe: "string",
+     genres: ["string"],
+     keywords: ["string"],
+     artists: ["string"]
    }
    ```
-3. **MongoDB regex search**: Searches `name`, `desc`, `genre`, `artist`, `album` fields using `$or` with a case-insensitive regex built from keywords.
-4. **Ranking**: Results sorted by `playCount` and `likeCount` descending (popular songs first).
-5. **Playlist creation**: Auto-generates a name (e.g., "Relaxing Evening Mix"), saves with `isAIGenerated: true`, limited to 20 songs.
+3. **Safety sanitization**: Any song-title/track-level suggestions are ignored; only intent fields are retained.
+4. **Heuristic backfill**: Intent is merged with prompt-derived terms when LLM output is sparse or unavailable.
+5. **MongoDB-only matching**: Queries `genre`, `artist`, `desc`, and `album` with regex/$in filters from sanitized intent.
+6. **Ranking + creation**: Sorts by `playCount`, then `likeCount`, creates playlist with `isAIGenerated: true`, capped at 20 songs.
+7. **Traceable response metadata**: API returns `intentSource`, `llmProvider`, `llmModel`, and sanitized `intent`.
+
+OpenRouter path details:
+- Uses OpenAI-compatible client with base URL `https://openrouter.ai/api/v1`.
+- Sends `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` headers for proper provider attribution.
+- Falls back safely to heuristic intent when API key/quota/provider call fails.
 
 ---
 
 ## 10. Recommendation Engine
+
+The rule-based flow below is still used as a safe fallback path. The newer ML-based layer is documented in Section 23.G.
 
 ### How Personalized Recommendations Work (`songService.js`)
 
@@ -633,7 +643,7 @@ Manages:
 
 | Threat | Mitigation |
 |--------|-----------|
-| **Brute-force login** | Rate limiting: 200 requests / 15 min per IP |
+| **Brute-force login** | API rate limiting is configurable and enforced in production |
 | **NoSQL injection** | Type validation on login inputs (must be strings) |
 | **XSS** | Helmet sets Content-Security-Policy headers |
 | **Clickjacking** | Helmet sets X-Frame-Options: DENY |
@@ -655,7 +665,7 @@ Manages:
 | `songController.js` | 824 | Play counting, dedup, likes, recently played, recommendations, CRUD |
 | `Player.jsx` | ~500 | Music player UI — progress, volume, controls. Time state is LOCAL. |
 | `DisplayHome.jsx` | 548 | Home page — assembles albums, trending, recently played, playlists |
-| `playlistController.js` | 352 | Full playlist CRUD + AI generator |
+| `playlistController.js` | 352 | Full playlist CRUD + LLM-intent playlist generation |
 | `authController.js` | 350 | Registration, login, profile, password change, account deletion |
 | `cacheService.js` | 131 | Redis wrapper — get/set/delete/pattern/live events |
 | `server.js` | 286 | Express app + Socket.io + multi-tab user tracking |
@@ -793,7 +803,7 @@ A: We have exactly two global states: player/audio and auth. Context API with `u
 A: The audio element fires `timeupdate` roughly once per second. If that value lived in React context, every component consuming the context would re-render every second — including the song list, sidebar, and search. I isolated time-related state into `Player.jsx` as local state. The context only holds track metadata and play status — things that change infrequently. This reduced re-renders from 300+/second to near zero for non-player components.
 
 **Q: What's your API design philosophy?**
-A: RESTful with consistent response format: `{ success: boolean, message/data }`. Auth routes return `data.user` + `data.token`. Error routes include `error` only in development mode. Rate-limited at 200 requests per 15 minutes per IP. Admin routes require both `authenticateToken` and `authorizeAdmin` middleware.
+A: RESTful with consistent response format: `{ success: boolean, message/data }`. Auth routes return `data.user` + `data.token`. Error routes include `error` only in development mode. API rate limiting is environment-configurable and enforced in production; local development defaults are relaxed for manual/E2E validation. Admin routes require both `authenticateToken` and `authorizeAdmin` middleware.
 
 ### Database & Data
 
@@ -860,7 +870,7 @@ A: `ErrorBoundary.jsx` wraps the entire app. If any component throws during rend
 ## 21. What I'd Do Differently
 
 - **Search**: Currently client-side (filters the local array). Works for hundreds of songs but won't scale. I'd add MongoDB text indexes or Meilisearch.
-- **Testing**: No automated tests. I'd add integration tests for critical paths (play flow, auth, playlist CRUD) using Vitest + Supertest.
+- **Testing**: Backend automated tests exist, but frontend E2E and deeper integration coverage can still be expanded.
 - **Logging**: Currently `console.error`/`console.warn`. For production: Winston or Pino with structured JSON, shipped to an aggregator.
 - **JWT refresh tokens**: Current tokens expire after 7 days with no refresh mechanism. I'd implement refresh token rotation.
 - **Image optimization**: Cloudinary auto-optimizes, but I'd add responsive image sizes (`srcset`) for different viewports.
@@ -875,7 +885,141 @@ A: `ErrorBoundary.jsx` wraps the entire app. If any component throws during rend
 "I built a full-stack music streaming platform with React and Node.js. The interesting parts are the performance optimization — I solved a React re-render bottleneck by isolating high-frequency state — and the backend architecture, which uses Redis caching with structural invalidation, atomic MongoDB operations to prevent race conditions, and Socket.io for real-time activity tracking across multiple tabs."
 
 ### In 3 Minutes
-Add specifics: the multi-tab socket tracking (mapping users to socket ID sets), the play count deduplication (dual frontend/backend guards), the AI playlist generator (keyword-to-genre mapping without external APIs), the recommendation engine (user affinity signals), the optimistic UI with rollback, the admin real-time dashboard with MongoDB aggregation pipelines, and the complete auth system with bcrypt hashing, role-based middleware, and cross-tab session sync. Mention the problems you hit (cache flooding/thundering herd, recently-played race condition, re-render cascades) and why the solutions work at scale.
+Add specifics: the multi-tab socket tracking (mapping users to socket ID sets), the play count deduplication (dual frontend/backend guards), the LLM-intent AI playlist generator (OpenRouter/OpenAI/Anthropic/Gemini intent extraction + MongoDB-only retrieval), the recommendation engine (user affinity signals), the optimistic UI with rollback, the admin real-time dashboard with MongoDB aggregation pipelines, and the complete auth system with bcrypt hashing, role-based middleware, and cross-tab session sync. Mention the problems you hit (cache flooding/thundering herd, recently-played race condition, re-render cascades) and why the solutions work at scale.
 
 ### In 10 Minutes
 Walk through the full architecture diagram. Explain the separation between User App and Admin Panel. Deep-dive into one feature flow end-to-end (best choice: "Playing a Song" — it touches all layers). Show the database schemas and explain the index strategy. Discuss the caching layers with TTLs. Explain the Socket.io multi-tab tracking. Cover the security layers. End with what you'd improve.
+
+---
+
+## 23. April 2026 Addendum
+
+This addendum captures the latest implementation updates and quality improvements added after the original deep-dive sections were written.
+
+### A) New Feature Area: Loop Diagnosis
+
+MusicFlow now includes an end-to-end "loop diagnosis" and wellbeing intervention flow.
+
+Backend additions:
+- `Backend/src/config/loopDiagnosisConfig.js`
+- `Backend/src/models/LoopEvent.js`
+- `Backend/src/routes/loopDiagnosis.js` mounted at `/api/loop-diagnosis`
+- `Backend/src/socket/loopDiagnosisSocket.js` for `/loopDiagnosis` namespace
+- `Backend/src/services/loopDiagnosis/`
+  - `loopDiagnosisEngine.js`
+  - `loopDetector.js`
+  - `adaptivePolicy.js`
+  - `candidateSelector.js`
+  - `llmBridgeSelector.js`
+  - `redisLoopTracker.js`
+  - `timeUtils.js`
+
+Frontend additions:
+- `MusicWebApp/src/hooks/useLoopDiagnosis.js`
+- `MusicWebApp/src/components/LoopDiagnosis/LoopInterventionCard.jsx`
+- `MusicWebApp/src/components/LoopDiagnosis/LoopInterventionCard.css`
+
+Admin additions:
+- `admin/src/pages/LoopDiagnosisStats.jsx`
+- Admin route at `/loop-diagnosis`
+
+Key behavior notes:
+- Detection runs additively from the play pipeline and never blocks playback.
+- Redis remains optional; loop-tracking falls back safely if Redis is unavailable.
+- Pending `triggered` interventions are deduplicated so users do not receive overlapping popups.
+- Interventions reset session baseline after action events for predictable cooldown/session timing.
+- Break action clears cooldown for controlled retest/developer flows.
+- Interventions support dismiss, bridge-played, break, snooze, switch-mix, and ignored outcomes.
+
+### B) LLM Playlist Generation + OpenRouter Integration
+
+Playlist generation has been upgraded from keyword-only matching to a hybrid LLM-intent pipeline.
+
+Implemented behavior:
+- Endpoint `POST /api/playlist/generate` extracts structured intent from user prompts.
+- Provider normalization supports: OpenRouter, OpenAI, Anthropic, and Google Gemini.
+- OpenRouter path uses OpenAI-compatible calls to `https://openrouter.ai/api/v1`.
+- LLM output is sanitized to intent-only fields (`mood`, `energy`, `vibe`, `genres`, `keywords`, `artists`).
+- Songs are always selected from MongoDB; no external recommendation payload is used.
+- Response includes observability metadata (`intentSource`, `llmProvider`, `llmModel`, `intent`).
+
+### C) API Additions (Loop Diagnosis)
+
+User endpoints:
+- `POST /api/loop-diagnosis/event/:id/dismiss`
+- `POST /api/loop-diagnosis/event/:id/bridge-played`
+- `POST /api/loop-diagnosis/event/:id/break`
+- `POST /api/loop-diagnosis/event/:id/snooze`
+- `POST /api/loop-diagnosis/event/:id/switch-mix`
+- `POST /api/loop-diagnosis/event/:id/ignored`
+- `GET /api/loop-diagnosis/preferences`
+- `PUT /api/loop-diagnosis/preferences`
+- `GET /api/loop-diagnosis/history`
+
+Admin endpoints:
+- `GET /api/loop-diagnosis/admin/stats`
+- `POST /api/loop-diagnosis/admin/clear-cooldown/:userId`
+
+Dev helper:
+- `POST /api/loop-diagnosis/cooldown/clear-self` (non-production)
+
+### D) Quality Gates and Validation Tooling
+
+Added CI workflow:
+- `.github/workflows/quality-gates.yml`
+
+Pipeline coverage:
+- Backend tests + high-severity audit
+- MusicWebApp lint/build + high-severity audit
+- Admin lint/build + high-severity audit
+- Backend `build:client` artifact verification
+
+Added package scripts:
+- Backend: `audit:high`, `ci`, `test:ld`
+- MusicWebApp: `audit:high`, `ci`
+- Admin: `audit:high`, `ci`
+
+### E) Test Coverage Additions
+
+New backend tests include:
+- `Backend/tests/playlistController.validation.test.js`
+- `Backend/tests/playlistIntent.test.js`
+- `Backend/tests/songService.test.js`
+- `Backend/tests/loopDiagnosis/loopDetector.test.js`
+- `Backend/tests/loopDiagnosis/llmBridgeSelector.test.js`
+- `Backend/tests/loopDiagnosis/engine.test.js`
+
+Simulation utility:
+- `scripts/simulateLoop.js`
+
+### F) Environment and Port Alignment
+
+Current local defaults:
+- Backend: `4002`
+- User app (Vite): `5000`
+- Admin app (Vite): `5173`
+
+Loop diagnosis environment settings are now documented in root `.env.example`, and the user app feature flag is available via `VITE_LOOP_DIAGNOSIS_ENABLED`.
+
+### G) ML-based Recommendation System
+
+MusicFlow now has an additive ML recommendation layer designed for stronger personalization and faster adaptation, especially for new users.
+
+Core modules and endpoints:
+- `Backend/src/ai/embeddingRecommender.js` computes ranked recommendations.
+- `Backend/src/controllers/aiRecommendationController.js` exposes API handlers.
+- `GET /api/ai/recommendations/:userId` returns recommendation lists and source metadata.
+- `POST /api/ai/feedback` records `play`, `like`, `skip`, and `click` interactions in real time.
+
+How scoring works (interview-ready):
+- Long-term preference: user-item embedding similarity from trained vectors.
+- Short-term intent: recent feedback signals and adaptive profile updates.
+- Final ranking: weighted combination of embedding score + feedback score, with deterministic tie-breaks and a controlled diversity tail.
+
+Cold-start behavior:
+- If user embedding is missing but feedback exists, the system uses feedback-bootstrap ranking so early actions immediately change results.
+- If both embedding and feedback signals are weak, the system falls back to deterministic recommendation/trending paths.
+
+Operational behavior:
+- Feedback submission invalidates per-user recommendation cache to reflect changes on the next request.
+- API responses include `source`, `fallbackReason`, and `metadata` for observability and debugging.

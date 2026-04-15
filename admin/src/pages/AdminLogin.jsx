@@ -47,27 +47,20 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center py-20 px-4 bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0] overflow-y-auto">
-      <div className="w-full max-w-lg animate-fade-in relative z-10 py-10">
-        {/* Branding - Spaced out */}
-        <div className="text-center mb-10">
-          <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-500/20">
-            <span className="text-white font-bold text-4xl leading-none">M</span>
+    <div className="min-h-screen grid place-items-center px-4 py-10 bg-gradient-to-br from-gray-50 via-white to-gray-100">
+      <div className="w-full max-w-md animate-fade-in">
+        <div className="card-admin-alt p-7 sm:p-8">
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
+              <span className="text-white font-bold text-2xl leading-none">M</span>
+            </div>
+            <h1 className="text-page-title">Admin Login</h1>
+            <p className="text-page-subtitle">Sign in to manage MusicFlow</p>
           </div>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">MusicFlow</h1>
-          <p className="text-slate-700 mt-4 font-semibold text-sm uppercase tracking-[0.3em]">Admin Console</p>
-        </div>
 
-        {/* Card - Spacious and Light */}
-        <div className="glass p-8 sm:p-12 rounded-[2.5rem] bg-white border border-slate-200 ">
-          <h2 className="text-3xl font-bold text-slate-800 mb-8 flex items-center justify-center gap-4">
-            <Lock className="w-7 h-7 text-blue-600" />
-            Security Shield
-          </h2>
-          
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-3">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-1">Admin Email</label>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="text-label">Admin Email</label>
               <input
                 className="input-admin"
                 placeholder="yours@musicflow.com"
@@ -79,8 +72,8 @@ const AdminLogin = () => {
               />
             </div>
 
-            <div className="space-y-3">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-1">Secret Password</label>
+            <div>
+              <label className="text-label">Password</label>
               <input
                 type="password"
                 className="input-admin"
@@ -94,26 +87,22 @@ const AdminLogin = () => {
 
             <button
               disabled={loading}
-              className="w-full btn-premium mt-10 flex items-center justify-center gap-3"
+              className="w-full btn-admin-primary !py-3.5 mt-2 flex items-center justify-center gap-2"
               type="submit"
             >
               {loading ? (
                 <>
-                  <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   Authenticating...
                 </>
               ) : (
-                "Access Management"
+                <>
+                  <Lock className="w-4 h-4" />
+                  Sign In
+                </>
               )}
             </button>
           </form>
-        </div>
-
-        {/* Footer info */}
-        <div className="text-center mt-12">
-          <p className="text-[11px] text-slate-600 font-bold uppercase tracking-[0.4em]">
-            Secure Infrastructure • authorized
-          </p>
         </div>
       </div>
     </div>

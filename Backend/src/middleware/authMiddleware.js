@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
+import { logger } from '../utils/logger.js';
 
 // Verify JWT Token
 const authenticateToken = async (req, res, next) => {
@@ -41,7 +42,7 @@ const authenticateToken = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
+    logger.error('Authentication error', { error: error.message });
 
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
@@ -57,10 +58,9 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Authentication failed',
-      error: error.message,
     });
   }
 };
@@ -84,11 +84,10 @@ const authorizeAdmin = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Admin authorization error:', error);
-    res.status(500).json({
+    logger.error('Admin authorization error', { error: error.message });
+    return res.status(500).json({
       success: false,
       message: 'Authorization failed',
-      error: error.message,
     });
   }
 };

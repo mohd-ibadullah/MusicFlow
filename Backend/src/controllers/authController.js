@@ -1,5 +1,12 @@
 import User from "../models/userModel.js";
 import jwt from "jsonwebtoken";
+import {
+  sendServerError,
+  sendUnauthorizedError,
+  sendValidationError,
+} from "../utils/http.js";
+import { logger } from "../utils/logger.js";
+import { isValidObjectId } from "../utils/validation.js";
 
 // Generate JWT Token
 const generateToken = (userId, role) => {
@@ -22,10 +29,7 @@ const registerUser = async (req, res) => {
 
     // Validation
     if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide all required fields",
-      });
+      return sendValidationError(res, "Please provide all required fields");
     }
 
     // Check if user already exists
@@ -60,12 +64,13 @@ const registerUser = async (req, res) => {
           likedSongs: user.likedSongs,
           recentlyPlayed: user.recentlyPlayed,
           playlists: user.playlists,
+          loopDiagnosisPrefs: user.loopDiagnosisPrefs,
         },
         token,
       },
     });
   } catch (error) {
-    console.error("Registration error:", error);
+    logger.error("Registration error", { error: error.message });
 
     // Handle validation errors
     if (error.name === "ValidationError") {
@@ -85,14 +90,7 @@ const registerUser = async (req, res) => {
       });
     }
 
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-    });
+    return sendServerError(res, "Internal server error", error);
   }
 };
 
@@ -103,17 +101,11 @@ const loginUser = async (req, res) => {
 
     // Validation
     if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide email and password",
-      });
+      return sendValidationError(res, "Please provide email and password");
     }
 
     if (typeof email !== "string" || typeof password !== "string") {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid input format",
-      });
+      return sendValidationError(res, "Invalid input format");
     }
 
     // Find user and include password
@@ -162,12 +154,13 @@ const loginUser = async (req, res) => {
           recentlyPlayed: user.recentlyPlayed,
           playlists: user.playlists,
           lastLogin: user.lastLogin,
+          loopDiagnosisPrefs: user.loopDiagnosisPrefs,
         },
         token,
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    logger.error("Login error", { error: error.message });
 
     // Handle validation errors
     if (error.name === "ValidationError") {
@@ -179,20 +172,17 @@ const loginUser = async (req, res) => {
       });
     }
 
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-    });
+    return sendServerError(res, "Internal server error", error);
   }
 };
 
 // Get User Profile
 const getUserProfile = async (req, res) => {
   try {
+    if (!isValidObjectId(req.user?.userId?.toString?.() || "")) {
+      return sendUnauthorizedError(res, "Invalid authentication token");
+    }
+
     const user = await User.findById(req.user.userId)
       .populate("likedSongs")
       .populate("playlists")
@@ -219,16 +209,13 @@ const getUserProfile = async (req, res) => {
           playlists: user.playlists,
           lastLogin: user.lastLogin,
           createdAt: user.createdAt,
+          loopDiagnosisPrefs: user.loopDiagnosisPrefs,
         },
       },
     });
   } catch (error) {
-    console.error("Get profile error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
+    logger.error("Get profile error", { error: error.message });
+    return sendServerError(res, "Internal server error", error);
   }
 };
 
@@ -238,12 +225,28 @@ const updateUserProfile = async (req, res) => {
     const { name, avatar } = req.body;
     const userId = req.user.userId;
 
+    if (!isValidObjectId(userId?.toString?.() || "")) {
+      return sendUnauthorizedError(res, "Invalid authentication token");
+    }
+
+    if (name !== undefined && (typeof name !== "string" || !name.trim())) {
+      return sendValidationError(res, "name must be a non-empty string");
+    }
+
+    if (avatar !== undefined && avatar !== null && typeof avatar !== "string") {
+      return sendValidationError(res, "avatar must be a string URL");
+    }
+
     // Fetch the original user so we always preserve their current role
     const existingUser = await User.findById(userId);
     if (!existingUser) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    const updateFields = { name, avatar, role: existingUser.role };
+    const updateFields = {
+      name: name !== undefined ? name : existingUser.name,
+      avatar: avatar !== undefined ? avatar : existingUser.avatar,
+      role: existingUser.role,
+    };
     const user = await User.findByIdAndUpdate(
       userId,
       updateFields,
@@ -266,12 +269,8 @@ const updateUserProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Update profile error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
+    logger.error("Update profile error", { error: error.message });
+    return sendServerError(res, "Internal server error", error);
   }
 };
 
@@ -280,6 +279,22 @@ const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.userId;
+
+    if (!isValidObjectId(userId?.toString?.() || "")) {
+      return sendUnauthorizedError(res, "Invalid authentication token");
+    }
+
+    if (
+      typeof currentPassword !== "string" ||
+      typeof newPassword !== "string" ||
+      !currentPassword.trim() ||
+      newPassword.trim().length < 6
+    ) {
+      return sendValidationError(
+        res,
+        "currentPassword and newPassword are required (new password min length is 6)",
+      );
+    }
 
     // Find user with password
     const user = await User.findById(userId).select("+password");
@@ -300,7 +315,7 @@ const changePassword = async (req, res) => {
     }
 
     // Update password
-    user.password = newPassword;
+    user.password = newPassword.trim();
     await user.save();
 
     res.status(200).json({
@@ -308,12 +323,8 @@ const changePassword = async (req, res) => {
       message: "Password changed successfully",
     });
   } catch (error) {
-    console.error("Change password error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
+    logger.error("Change password error", { error: error.message });
+    return sendServerError(res, "Internal server error", error);
   }
 };
 
@@ -321,6 +332,10 @@ const changePassword = async (req, res) => {
 const deleteUserAccount = async (req, res) => {
   try {
     const userId = req.user.userId;
+
+    if (!isValidObjectId(userId?.toString?.() || "")) {
+      return sendUnauthorizedError(res, "Invalid authentication token");
+    }
 
     // Soft delete - deactivate account
     await User.findByIdAndUpdate(userId, { isActive: false });
@@ -330,12 +345,8 @@ const deleteUserAccount = async (req, res) => {
       message: "Account deleted successfully",
     });
   } catch (error) {
-    console.error("Delete account error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
+    logger.error("Delete account error", { error: error.message });
+    return sendServerError(res, "Internal server error", error);
   }
 };
 

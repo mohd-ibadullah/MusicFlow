@@ -1,14 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { url } from "../App";
 import { toast } from "react-toastify";
 import { Search, RefreshCcw, Music, Trash2 } from "lucide-react";
 import DeleteModal from "../components/DeleteModal";
+import { io as createSocket } from "socket.io-client";
+
+const REALTIME_EVENT_DEDUP_TTL_MS = 120000;
 
 const ListSong = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const socketRef = useRef(null);
+  const processedRealtimeEventIdsRef = useRef(new Map());
 
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState({
@@ -17,6 +22,61 @@ const ListSong = () => {
     name: null,
     loading: false
   });
+
+  const unwrapRealtimePayload = useCallback((eventEnvelope) => {
+    if (eventEnvelope && typeof eventEnvelope === "object" && eventEnvelope.payload) {
+      return eventEnvelope.payload;
+    }
+    return eventEnvelope;
+  }, []);
+
+  const shouldProcessRealtimeEvent = useCallback((eventEnvelope) => {
+    const eventId = eventEnvelope?.eventId;
+    if (!eventId) return true;
+
+    const now = Date.now();
+    for (const [id, expiresAt] of processedRealtimeEventIdsRef.current.entries()) {
+      if (!expiresAt || expiresAt <= now) {
+        processedRealtimeEventIdsRef.current.delete(id);
+      }
+    }
+
+    const expiresAt = processedRealtimeEventIdsRef.current.get(eventId);
+    if (expiresAt && expiresAt > now) return false;
+
+    processedRealtimeEventIdsRef.current.set(eventId, now + REALTIME_EVENT_DEDUP_TTL_MS);
+    return true;
+  }, []);
+
+  const upsertSong = useCallback((song) => {
+    if (!song?._id) return;
+
+    setData((prev) => {
+      const current = Array.isArray(prev) ? prev : [];
+      const songId = song._id.toString();
+      const existingIndex = current.findIndex((item) => item?._id?.toString?.() === songId);
+
+      if (existingIndex === -1) {
+        const next = [song, ...current];
+        return next.sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0));
+      }
+
+      const next = [...current];
+      next[existingIndex] = { ...next[existingIndex], ...song };
+      return next;
+    });
+  }, []);
+
+  const removeSongById = useCallback((songId) => {
+    if (!songId) return;
+
+    const normalizedId = songId.toString();
+    setData((prev) =>
+      (Array.isArray(prev) ? prev : []).filter(
+        (song) => song?._id?.toString?.() !== normalizedId,
+      ),
+    );
+  }, []);
 
   const fetchSongs = async () => {
     try {
@@ -48,7 +108,7 @@ const ListSong = () => {
       if (response.data.success) {
         toast.success(`"${name}" deleted`);
         setDeleteModal({ isOpen: false, id: null, name: null, loading: false });
-        await fetchSongs();
+        removeSongById(id);
       } else {
         toast.error(response.data.message || "Failed to delete song");
         setDeleteModal(prev => ({ ...prev, loading: false }));
@@ -79,6 +139,62 @@ const ListSong = () => {
 
   useEffect(() => { fetchSongs(); }, []);
 
+  useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    const socketTarget = url || undefined;
+
+    const socket = socketTarget
+      ? createSocket(socketTarget, {
+          path: "/socket.io",
+          transports: ["polling", "websocket"],
+          auth: token ? { token } : undefined,
+          withCredentials: true,
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 8000,
+          timeout: 10000,
+        })
+      : createSocket({
+          path: "/socket.io",
+          transports: ["polling", "websocket"],
+          auth: token ? { token } : undefined,
+          withCredentials: true,
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 8000,
+          timeout: 10000,
+        });
+
+    socketRef.current = socket;
+
+    socket.on("connect_error", (err) => {
+      console.warn("[Admin Songs] Socket connection error:", err.message);
+    });
+
+    socket.on("song:created", (eventEnvelope) => {
+      if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+      const payload = unwrapRealtimePayload(eventEnvelope);
+      if (payload?.song) {
+        upsertSong(payload.song);
+      }
+    });
+
+    socket.on("song:deleted", (eventEnvelope) => {
+      if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+      const payload = unwrapRealtimePayload(eventEnvelope);
+      removeSongById(payload?.songId);
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [removeSongById, shouldProcessRealtimeEvent, unwrapRealtimePayload, upsertSong]);
+
   if (loading) {
     return (
       <div className="grid place-items-center min-h-[60vh] animate-fade-in">
@@ -91,9 +207,9 @@ const ListSong = () => {
   }
 
   return (
-    <div className="w-full animate-fade-in">
+    <div className="w-full space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-page-title">Songs</h1>
           <p className="text-page-subtitle">
@@ -120,7 +236,7 @@ const ListSong = () => {
       </div>
 
       {data.length === 0 ? (
-        <div className="card-admin-alt text-center py-20 px-8">
+        <div className="card-admin text-center py-20 px-8">
           <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner text-gray-300">
             <Music className="w-7 h-7" />
           </div>
@@ -128,9 +244,9 @@ const ListSong = () => {
           <p className="text-sm text-gray-500 max-w-[200px] mx-auto leading-relaxed">Your library is currently empty. Start by adding your first track.</p>
         </div>
       ) : (
-        <div className="card-admin-alt overflow-hidden">
+        <div className="card-admin overflow-hidden">
           {/* Table Header */}
-          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 bg-gray-50/20 border-b border-gray-100/60">
+          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 bg-gray-50/10 border-b border-gray-100/60">
             <div className="col-span-1 table-admin-header">Cover</div>
             <div className="col-span-3 table-admin-header">Song</div>
             <div className="col-span-2 table-admin-header">Album</div>
@@ -171,7 +287,7 @@ const ListSong = () => {
                   <span className="badge-blue">{item.duration || "0:00"}</span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-[11px] font-bold text-gray-400 tracking-tight uppercase leading-none">{formatDate(item.createdAt)}</span>
+                  <span className="text-xs font-semibold text-gray-500 leading-none">{formatDate(item.createdAt)}</span>
                 </div>
                 <div className="col-span-1 text-center">
                   <button

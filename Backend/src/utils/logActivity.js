@@ -1,4 +1,8 @@
 import Activity from "../models/activityModel.js";
+import {
+  emitRealtime,
+  REALTIME_EVENTS,
+} from "../socket/realtimeEvents.js";
 
 const logActivity = async ({ type, message, userId = null, req = null }) => {
   try {
@@ -9,12 +13,18 @@ const logActivity = async ({ type, message, userId = null, req = null }) => {
       try {
         const io = req.app.get("io");
         if (io) {
-          io.emit("activity_created", {
+          const payload = {
             _id: activity._id,
             type,
             message,
             userId,
-            createdAt: activity.createdAt
+            createdAt: activity.createdAt,
+          };
+
+          emitRealtime(io, REALTIME_EVENTS.ACTIVITY_CREATED, payload, {
+            source: "activity_logger",
+            audience: "all",
+            legacy: [{ name: "activity_created", payload }],
           });
         }
       } catch (emitErr) {

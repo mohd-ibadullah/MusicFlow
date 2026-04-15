@@ -1,4 +1,5 @@
 import { createClient } from "redis";
+import { logger } from "../utils/logger.js";
 
 let redisClient = null;
 let redisAvailable = false;
@@ -48,13 +49,13 @@ const connectRedis = async () => {
 
     redisClient.on("error", (err) => {
       if (!hasLoggedError) {
-        console.warn("Redis client error:", err.message);
+        logger.warn("Redis client error", { error: err.message });
         hasLoggedError = true;
       }
       redisAvailable = false;
     });
     redisClient.on("connect", () => {
-      console.log("✅ Redis connected"); // Single essential startup log
+      logger.info("Redis connected");
       redisAvailable = true;
     });
 
@@ -62,15 +63,18 @@ const connectRedis = async () => {
     redisAvailable = true;
     return redisClient;
   } catch (error) {
-    console.warn("⚠️ Redis connection failed, running without cache:", error.message);
+    logger.warn("Redis connection failed, running without cache", {
+      error: error.message,
+    });
     redisAvailable = false;
+    redisClient = null;
     return null;
   }
 };
 
 const isRedisAvailable = () => redisAvailable && redisClient;
 
-const getRedisClient = () => redisClient;
+const getRedisClient = () => (redisAvailable ? redisClient : null);
 
 export default connectRedis;
 export { isRedisAvailable, getRedisClient };

@@ -186,12 +186,14 @@ const Library = () => {
                 id={item._id}
               />
             ) : (
-              <PlaylistItem
-                id={item._id}
-                name={item.name}
-                songCount={item.songs?.length || 0}
-                image={item.image}
-              />
+              <div className="overflow-visible">
+                <PlaylistItem
+                  id={item._id}
+                  name={item.name}
+                  songCount={item.songs?.length || 0}
+                  image={item.image}
+                />
+              </div>
             )}
           </div>
         ))}

@@ -3,6 +3,13 @@ import Album from "../models/albumModel.js";
 import fs from "fs";
 import { cacheGet, cacheSet, CACHE_KEYS, clearAlbumCaches } from "../services/cacheService.js";
 import logActivity from "../utils/logActivity.js";
+import { sendServerError, sendValidationError } from "../utils/http.js";
+import { logger } from "../utils/logger.js";
+import { isValidObjectId } from "../utils/validation.js";
+import {
+  emitRealtimeFromReq,
+  REALTIME_EVENTS,
+} from "../socket/realtimeEvents.js";
 
 const addAlbum = async (req, res) => {
   try {
@@ -50,6 +57,18 @@ const addAlbum = async (req, res) => {
       await clearAlbumCaches();
       logActivity({ type: "album_added", message: `Album "${album.name}" was added`, req });
 
+      emitRealtimeFromReq(
+        req,
+        REALTIME_EVENTS.ALBUM_CREATED,
+        {
+          album,
+        },
+        {
+          source: "album_controller",
+          audience: "all",
+        }
+      );
+
       try {
         fs.unlinkSync(imageFile);
       } catch (cleanupError) {
@@ -62,28 +81,27 @@ const addAlbum = async (req, res) => {
         album,
       });
     } catch (cloudinaryError) {
-      console.error("❌ Cloudinary error:", cloudinaryError);
+      logger.error("Cloudinary error during album upload", {
+        error: cloudinaryError.message,
+      });
 
       // Clean up temp file on error
       try {
         fs.unlinkSync(imageFile);
       } catch (cleanupError) {
-        console.warn("⚠️ Could not clean up temp file on error:", cleanupError.message);
+        logger.warn("Could not clean up temp file on album upload error", {
+          error: cleanupError.message,
+        });
       }
 
       res.status(400).json({
         success: false,
         message: "Cloudinary upload failed. Please check your image file and try again.",
-        error: cloudinaryError.message
       });
     }
   } catch (error) {
-    console.error("❌ Album upload error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error adding album",
-      error: error.message
-    });
+    logger.error("Album upload error", { error: error.message });
+    return sendServerError(res, "Error adding album", error);
   }
 };
 
@@ -105,18 +123,19 @@ const listAlbum = async (req, res) => {
       allAlbums
     });
   } catch (error) {
-    console.error("List albums error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching albums",
-      error: error.message
-    });
+    logger.error("List albums error", { error: error.message });
+    return sendServerError(res, "Error fetching albums", error);
   }
 };
 
 const removeAlbum = async (req, res) => {
   try {
-    const result = await Album.findByIdAndDelete(req.body.id);
+    const albumId = req.body?.id?.toString?.() || "";
+    if (!isValidObjectId(albumId)) {
+      return sendValidationError(res, "Invalid album id");
+    }
+
+    const result = await Album.findByIdAndDelete(albumId);
     if (!result) {
       return res.status(404).json({
         success: false,
@@ -124,17 +143,34 @@ const removeAlbum = async (req, res) => {
       });
     }
     await clearAlbumCaches();
+
+    await logActivity({
+      type: "album_deleted",
+      message: `Album "${result.name}" was deleted`,
+      userId: req.user?.userId || null,
+      req,
+    });
+
+    emitRealtimeFromReq(
+      req,
+      REALTIME_EVENTS.ALBUM_DELETED,
+      {
+        albumId: result._id?.toString?.() || albumId,
+        albumName: result.name,
+      },
+      {
+        source: "album_controller",
+        audience: "all",
+      }
+    );
+
     res.status(200).json({
       success: true,
       message: "Album deleted successfully"
     });
   } catch (error) {
-    console.error("Remove album error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error deleting album",
-      error: error.message
-    });
+    logger.error("Remove album error", { error: error.message });
+    return sendServerError(res, "Error deleting album", error);
   }
 };
 

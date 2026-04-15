@@ -22,6 +22,10 @@ const playlistSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  aiIntentLabel: {
+    type: String,
+    default: ""
+  },
   createdAt: { 
     type: Date, 
     default: Date.now 

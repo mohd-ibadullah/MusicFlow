@@ -8,6 +8,7 @@ import ListSong from "./pages/ListSong";
 import AddAlbum from "./pages/AddAlbum";
 import AdminLogin from "./pages/AdminLogin";
 import AdminAnalytics from "./pages/AdminAnalytics";
+import LoopDiagnosisStats from "./pages/LoopDiagnosisStats";
 import SideBar from "./components/SideBar";
 import Navbar from "./components/Navbar";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
@@ -24,11 +25,11 @@ const App = () => {
           path="/*" 
           element={
             <AdminProtectedRoute>
-              <div className="flex min-h-screen">
+              <div className="flex h-screen overflow-hidden">
                 <SideBar />
-                <div className="flex-1 flex flex-col">
+                <div className="flex-1 min-w-0 flex flex-col min-h-0">
                   <Navbar />
-                  <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 via-white to-gray-50 p-5 sm:p-7 lg:p-8">
+                  <main className="flex-1 min-h-0 overflow-y-auto bg-gradient-to-br from-gray-50 via-white to-gray-50 p-5 sm:p-7 lg:p-8">
                     <Routes>
                       <Route path="/" element={<Navigate to="/list-song" replace />} />
                       <Route path="/add-song" element={<AddSong />} />
@@ -36,6 +37,7 @@ const App = () => {
                       <Route path="/list-album" element={<ListAlbum />} />
                       <Route path="/list-song" element={<ListSong />} />
                       <Route path="/analytics" element={<AdminAnalytics />} />
+                      <Route path="/loop-diagnosis" element={<LoopDiagnosisStats />} />
                     </Routes>
                   </main>
                 </div>

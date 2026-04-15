@@ -3,21 +3,25 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { url } from "../App";
 import { toast } from "react-toastify";
+import { io as createSocket } from "socket.io-client";
 import { 
   Play, 
   Plus, 
   Heart, 
-  PlusSquare, 
   Disc, 
-  BarChart3, 
   Users, 
   Music, 
   Library, 
   RefreshCcw, 
   Info, 
-  Trash2,
+  Sparkles,
+  Pencil,
+  RotateCcw,
+  Radio,
   ListMusic 
 } from "lucide-react";
+
+const REALTIME_EVENT_DEDUP_TTL_MS = 120000;
 
 const TYPE_META = {
   song_played: { 
@@ -44,6 +48,41 @@ const TYPE_META = {
     icon: Library, 
     color: "bg-orange-50 text-orange-600", 
     label: "Album" 
+  },
+  song_deleted: {
+    icon: Play,
+    color: "bg-rose-50 text-rose-600",
+    label: "Song Removed",
+  },
+  album_deleted: {
+    icon: Library,
+    color: "bg-rose-50 text-rose-600",
+    label: "Album Removed",
+  },
+  playlist_deleted: {
+    icon: ListMusic,
+    color: "bg-rose-50 text-rose-600",
+    label: "Playlist Removed",
+  },
+  playlist_updated: {
+    icon: Pencil,
+    color: "bg-cyan-50 text-cyan-700",
+    label: "Playlist Updated",
+  },
+  ai_playlist_generated: {
+    icon: Sparkles,
+    color: "bg-fuchsia-50 text-fuchsia-700",
+    label: "AI Playlist",
+  },
+  loop_triggered: {
+    icon: RotateCcw,
+    color: "bg-amber-50 text-amber-700",
+    label: "Loop Triggered",
+  },
+  loop_updated: {
+    icon: Radio,
+    color: "bg-teal-50 text-teal-700",
+    label: "Loop Updated",
   },
 };
 
@@ -73,10 +112,36 @@ const AdminAnalytics = () => {
   const [liveListeners, setLiveListeners] = useState(0);
   const socketRef = useRef(null);
   const socketConnectedRef = useRef(false);
+  const processedRealtimeEventIdsRef = useRef(new Map());
 
   const authHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
   });
+
+  const unwrapRealtimePayload = useCallback((eventEnvelope) => {
+    if (eventEnvelope && typeof eventEnvelope === "object" && eventEnvelope.payload) {
+      return eventEnvelope.payload;
+    }
+    return eventEnvelope;
+  }, []);
+
+  const shouldProcessRealtimeEvent = useCallback((eventEnvelope) => {
+    const eventId = eventEnvelope?.eventId;
+    if (!eventId) return true;
+
+    const now = Date.now();
+    for (const [id, expiresAt] of processedRealtimeEventIdsRef.current.entries()) {
+      if (!expiresAt || expiresAt <= now) {
+        processedRealtimeEventIdsRef.current.delete(id);
+      }
+    }
+
+    const expiresAt = processedRealtimeEventIdsRef.current.get(eventId);
+    if (expiresAt && expiresAt > now) return false;
+
+    processedRealtimeEventIdsRef.current.set(eventId, now + REALTIME_EVENT_DEDUP_TTL_MS);
+    return true;
+  }, []);
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -123,8 +188,13 @@ const AdminAnalytics = () => {
 
   const addActivity = useCallback((newActivity) => {
     setActivity(prev => {
+      const derivedId =
+        newActivity?._id ||
+        newActivity?.eventId ||
+        `${newActivity?.type || "activity"}_${newActivity?.songId || newActivity?.playlistId || newActivity?.albumId || newActivity?.loopEventId || newActivity?.createdAt || Date.now()}`;
+
       const activityObj = {
-        _id: newActivity._id,
+        _id: derivedId,
         type: newActivity.type || "song_played",
         message: newActivity.message || "New activity",
         createdAt: newActivity.createdAt || new Date().toISOString(),
@@ -136,29 +206,59 @@ const AdminAnalytics = () => {
     });
   }, []);
 
-  const updateTopSongs = useCallback((payload = null) => {
-    if (!payload?.songId) return;
+  const updateTopSongs = useCallback((payload = null, explicitType = null) => {
+    const type = explicitType || payload?.type;
+    if (!type) return;
+
     setAnalytics(prev => {
       if (!prev) return prev;
       const updated = { ...prev };
-      if (payload.type === "song_played" && typeof updated.totalStreams === "number") {
+
+      if (type === "song_played" && typeof updated.totalStreams === "number") {
         updated.totalStreams += 1;
       }
+
+      if (type === "song_created" && typeof updated.totalSongs === "number") {
+        updated.totalSongs += 1;
+      }
+
+      if (type === "song_deleted" && typeof updated.totalSongs === "number") {
+        updated.totalSongs = Math.max(0, updated.totalSongs - 1);
+      }
+
+      if (type === "album_created" && typeof updated.totalAlbums === "number") {
+        updated.totalAlbums += 1;
+      }
+
+      if (type === "album_deleted" && typeof updated.totalAlbums === "number") {
+        updated.totalAlbums = Math.max(0, updated.totalAlbums - 1);
+      }
+
+      const payloadSongId = payload?.songId?.toString?.() || payload?.songId;
+
       if (updated.topSongs) {
         updated.topSongs = [...updated.topSongs];
         const songIndex = updated.topSongs.findIndex(song =>
-          song._id === payload.songId || song._id?.toString() === payload.songId
+          song._id?.toString?.() === payloadSongId?.toString?.()
         );
+
+        if (type === "song_deleted" && payloadSongId) {
+          updated.topSongs = updated.topSongs.filter(
+            (song) => song?._id?.toString?.() !== payloadSongId.toString(),
+          );
+        }
+
         if (songIndex !== -1) {
-          if (payload.type === "song_played") {
+          if (type === "song_played") {
             updated.topSongs[songIndex] = { ...updated.topSongs[songIndex], playCount: (updated.topSongs[songIndex].playCount || 0) + 1 };
             updated.topSongs.sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
-          } else if ((payload.type === "song_liked" || payload.type === "song_unliked") && payload.likeCount !== undefined) {
+          } else if ((type === "song_liked" || type === "song_unliked") && payload.likeCount !== undefined) {
             updated.topSongs[songIndex] = { ...updated.topSongs[songIndex], likeCount: payload.likeCount };
           }
         }
       }
-      if (payload.type === "song_played" && payload.artist && updated.topArtists) {
+
+      if (type === "song_played" && payload?.artist && updated.topArtists) {
         updated.topArtists = [...updated.topArtists];
         const artistIndex = updated.topArtists.findIndex(a => a.name === payload.artist || a._id === payload.artist);
         if (artistIndex !== -1) {
@@ -166,6 +266,7 @@ const AdminAnalytics = () => {
           updated.topArtists.sort((a, b) => (b.totalPlays || 0) - (a.totalPlays || 0));
         }
       }
+
       return updated;
     });
   }, []);
@@ -177,46 +278,179 @@ const AdminAnalytics = () => {
 
   useEffect(() => {
     let mounted = true;
-    let reconnectTimeout = null;
+    const token = localStorage.getItem("auth_token");
+    const socketTarget = url || undefined;
 
-    const connectSocket = async () => {
-      try {
-        const { io } = await import("socket.io-client");
-        const socket = io({ path: "/socket.io", transports: ["polling", "websocket"] });
-        if (!mounted) { socket.disconnect(); return; }
+    try {
+      const socket = socketTarget
+        ? createSocket(socketTarget, {
+            path: "/socket.io",
+            transports: ["polling", "websocket"],
+            auth: token ? { token } : undefined,
+            withCredentials: true,
+            reconnection: true,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 8000,
+            timeout: 10000,
+          })
+        : createSocket({
+            path: "/socket.io",
+            transports: ["polling", "websocket"],
+            auth: token ? { token } : undefined,
+            withCredentials: true,
+            reconnection: true,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 8000,
+            timeout: 10000,
+          });
 
-        socketRef.current = socket;
-        socketConnectedRef.current = false;
-
-        socket.on("connect", () => {
-          socketConnectedRef.current = true;
-          socket.emit("get_listeners");
-        });
-        socket.on("disconnect", () => { socketConnectedRef.current = false; });
-        socket.on("connect_error", (err) => {
-          socketConnectedRef.current = false;
-          if (mounted) {
-            clearTimeout(reconnectTimeout);
-            reconnectTimeout = setTimeout(() => { if (socketRef.current && !socketRef.current.connected) socketRef.current.connect(); }, 3000);
-          }
-        });
-        socket.on("users_listening", (count) => { if (mounted) setLiveListeners(typeof count === "number" ? Math.max(0, count) : 0); });
-        socket.on("user_listening", () => {});
-        socket.on("activity_created", (newActivity) => { if (mounted) addActivity(newActivity); });
-        socket.on("analytics_updated", (payload) => { if (mounted) updateTopSongs(payload); });
-      } catch (err) {
-        console.warn("[Admin Analytics] Socket not available:", err.message);
+      if (!mounted) {
+        socket.disconnect();
+        return undefined;
       }
-    };
 
-    connectSocket();
+      socketRef.current = socket;
+      socketConnectedRef.current = false;
+
+      const handleListenersCount = (eventOrCount) => {
+        const payload = unwrapRealtimePayload(eventOrCount);
+        const count = typeof payload === "number" ? payload : payload?.count;
+        if (!mounted) return;
+        setLiveListeners(typeof count === "number" ? Math.max(0, count) : 0);
+      };
+
+      const handleRealtimeActivity = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (!payload || !mounted) return;
+
+        addActivity({
+          ...payload,
+          eventId: eventEnvelope?.eventId,
+          _id: payload?._id || eventEnvelope?.eventId,
+        });
+      };
+
+      const handleSongPlayed = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (!payload || !mounted) return;
+        updateTopSongs(payload, "song_played");
+      };
+
+      const handleSongLiked = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (!payload || !mounted) return;
+        updateTopSongs(payload, "song_liked");
+      };
+
+      const handleSongUnliked = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (!payload || !mounted) return;
+        updateTopSongs(payload, "song_unliked");
+      };
+
+      const handleSongCreated = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (!payload || !mounted) return;
+        updateTopSongs(payload, "song_created");
+      };
+
+      const handleSongDeleted = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (!payload || !mounted) return;
+        updateTopSongs(payload, "song_deleted");
+      };
+
+      const handleAlbumCreated = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (!payload || !mounted) return;
+        updateTopSongs(payload, "album_created");
+      };
+
+      const handleAlbumDeleted = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (!payload || !mounted) return;
+        updateTopSongs(payload, "album_deleted");
+      };
+
+      const handleLiveStreamActivity = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (!payload || !mounted) return;
+
+        if (payload.type === "loop_triggered") {
+          addActivity({
+            _id: eventEnvelope?.eventId || payload.loopEventId,
+            eventId: eventEnvelope?.eventId,
+            type: "loop_triggered",
+            message: `Loop intervention triggered (${payload.interventionType || "support"})`,
+            createdAt: payload.createdAt || new Date().toISOString(),
+            userId: payload.userId || null,
+          });
+          return;
+        }
+
+        if (payload.type === "loop_updated") {
+          const status = payload.interventionStatus || "updated";
+          addActivity({
+            _id: eventEnvelope?.eventId || payload.loopEventId,
+            eventId: eventEnvelope?.eventId,
+            type: "loop_updated",
+            message: `Loop event ${payload.loopEventId || ""} marked ${status}`.trim(),
+            createdAt: payload.updatedAt || new Date().toISOString(),
+            userId: payload.userId || null,
+          });
+        }
+      };
+
+      socket.on("connect", () => {
+        socketConnectedRef.current = true;
+        socket.emit("get_listeners");
+      });
+
+      socket.on("disconnect", () => {
+        socketConnectedRef.current = false;
+      });
+
+      socket.on("connect_error", (err) => {
+        socketConnectedRef.current = false;
+        console.warn("[Admin Analytics] Socket connection error:", err.message);
+      });
+
+      socket.on("listeners:updated", handleListenersCount);
+      socket.on("users_listening", handleListenersCount);
+      socket.on("activity:created", handleRealtimeActivity);
+      socket.on("activity_created", handleRealtimeActivity);
+      socket.on("song:played", handleSongPlayed);
+      socket.on("song:liked", handleSongLiked);
+      socket.on("song:unliked", handleSongUnliked);
+      socket.on("song:created", handleSongCreated);
+      socket.on("song:deleted", handleSongDeleted);
+      socket.on("album:created", handleAlbumCreated);
+      socket.on("album:deleted", handleAlbumDeleted);
+      socket.on("live:stream:activity", handleLiveStreamActivity);
+    } catch (err) {
+      console.warn("[Admin Analytics] Socket not available:", err.message);
+    }
 
     return () => {
       mounted = false;
-      clearTimeout(reconnectTimeout);
-      if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; socketConnectedRef.current = false; }
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      socketConnectedRef.current = false;
     };
-  }, [fetchAnalytics, fetchActivity, addActivity]);
+  }, [addActivity, shouldProcessRealtimeEvent, unwrapRealtimePayload, updateTopSongs]);
 
   const handleRefresh = () => { fetchAnalytics(); fetchActivity(true); };
 
@@ -271,7 +505,7 @@ const AdminAnalytics = () => {
                 <stat.icon className="w-5 h-5" />
               </div>
               {stat.live && (
-                <span className="badge-green text-[10px] flex items-center gap-1">
+                <span className="badge-green text-[11px] flex items-center gap-1">
                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse-dot"></span>
                   Live
                 </span>
@@ -280,7 +514,7 @@ const AdminAnalytics = () => {
             <p className="text-[26px] font-extrabold text-gray-900 tracking-tight mb-0.5">
               {getStatValue(stat.key)?.toLocaleString()}
             </p>
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-[0.08em]">{stat.label}</p>
           </div>
         ))}
       </div>
@@ -307,11 +541,11 @@ const AdminAnalytics = () => {
                   <img src={song.image} alt={song.name} className="w-9 h-9 rounded-lg object-cover shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900 truncate">{song.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{song.artist || song.album}</p>
+                    <p className="text-sm text-gray-600 truncate">{song.artist || song.album}</p>
                   </div>
                   <div className="text-right shrink-0 pr-1">
                     <p className="text-sm font-bold text-gray-800 leading-tight">{song.playCount?.toLocaleString() || 0} plays</p>
-                    <p className="text-[11px] text-gray-400 font-medium brightness-90">{song.likeCount?.toLocaleString() || 0} likes</p>
+                    <p className="text-xs text-gray-500 font-medium">{song.likeCount?.toLocaleString() || 0} likes</p>
                   </div>
                 </div>
               ))}
@@ -346,8 +580,8 @@ const AdminAnalytics = () => {
                     <p className="text-xs text-gray-500">{artist.totalSongs} {artist.totalSongs === 1 ? "song" : "songs"}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-xs font-medium text-gray-700">{artist.totalPlays?.toLocaleString() || 0}</p>
-                    <p className="text-[10px] font-medium text-gray-400 uppercase tracking-tighter">listens</p>
+                    <p className="text-sm font-semibold text-gray-700">{artist.totalPlays?.toLocaleString() || 0}</p>
+                    <p className="text-[11px] font-medium text-gray-500 uppercase tracking-tight">listens</p>
                   </div>
                 </div>
               ))}
@@ -381,13 +615,6 @@ const AdminAnalytics = () => {
                   color: "bg-gray-50 text-gray-600" 
                 };
                 const Icon = meta.icon;
-                const phrases = {
-                  song_played: ["Started playing", "Listening to", "Enjoying"],
-                  song_added: ["Added to library:", "Newly added:"],
-                  song_liked: ["Liked the track", "Recommended"],
-                };
-                const randomPhrase = phrases[item.type]?.[Math.floor(Math.random() * phrases[item.type].length)] || meta.label;
-                const naturalMsg = item.message.replace(meta.label, randomPhrase);
 
                 return (
                   <div key={item._id || `${item.type}_${item.createdAt}`} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50/30 transition-all duration-200 border-l-2 border-transparent hover:border-blue-500/20">
@@ -395,11 +622,11 @@ const AdminAnalytics = () => {
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-700 leading-relaxed">
+                      <p className="text-[15px] text-gray-700 leading-relaxed">
                         <span className="font-semibold text-gray-900">{item.message.split(' ')[0]}</span> {item.message.slice(item.message.indexOf(' ') + 1)}
                       </p>
                     </div>
-                    <p className="text-[11px] font-semibold text-gray-400 whitespace-nowrap tracking-tight">{timeAgo(item.createdAt)}</p>
+                    <p className="text-xs font-semibold text-gray-500 whitespace-nowrap">{timeAgo(item.createdAt)}</p>
                   </div>
                 );
               })}

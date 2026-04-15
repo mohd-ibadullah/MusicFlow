@@ -1,5 +1,6 @@
 // components/DisplayPlaylists.jsx
 import React, { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Music2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PlaylistItem from "./playlistItem";
@@ -41,6 +42,24 @@ const DisplayPlaylists = () => {
     setPlaylistToDelete(null);
   };
 
+  const renderGlobalDeleteModal = (content) => {
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+      <div
+        className="fixed top-0 left-0 flex items-center justify-center p-4 animate-fade-in"
+        style={{ width: "100vw", height: "100dvh", zIndex: 2147483647 }}
+      >
+        <div
+          className="absolute inset-0 bg-black/60 backdrop-blur-md"
+          onClick={() => setPlaylistToDelete(null)}
+        ></div>
+        <div className="relative w-full max-w-md">{content}</div>
+      </div>,
+      document.body
+    );
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
@@ -56,8 +75,8 @@ const DisplayPlaylists = () => {
             </svg>
           </button>
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">Playlists</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
+            <h1 className="text-h1 text-gray-900 dark:text-gray-100">Playlists</h1>
+            <p className="text-base text-gray-600 dark:text-gray-400 mt-1">
               {filteredPlaylists.length} {filteredPlaylists.length === 1 ? 'playlist' : 'playlists'}
             </p>
           </div>
@@ -84,7 +103,7 @@ const DisplayPlaylists = () => {
           placeholder="Search playlists..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
+          className="input-search-soft pl-10"
         />
       </div>
 
@@ -93,7 +112,7 @@ const DisplayPlaylists = () => {
         <div className="songs-grid">
           {filteredPlaylists.map((playlist, index) => (
             <div key={playlist._id || index} className="animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
-              <div className="relative group">
+              <div className="relative group/playlist-card overflow-visible">
                 <PlaylistItem
                   id={playlist._id}
                   name={playlist.name}
@@ -108,7 +127,7 @@ const DisplayPlaylists = () => {
                     e.stopPropagation();
                     setPlaylistToDelete({ _id: playlist._id, name: playlist.name });
                   }}
-                  className="absolute z-10 top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-md"
+                  className="absolute z-10 top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center opacity-0 group-hover/playlist-card:opacity-100 transition-all duration-200 shadow-md"
                   title="Delete playlist"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,9 +164,9 @@ const DisplayPlaylists = () => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {playlistToDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white dark:bg-[#242b3b] rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-gray-700/50">
+      {playlistToDelete &&
+        renderGlobalDeleteModal(
+          <div className="bg-white dark:bg-[#242b3b] rounded-2xl p-6 w-full shadow-xl border border-gray-200 dark:border-gray-700/50">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Delete Playlist</h2>
             <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm">
               Are you sure you want to delete "<span className="font-bold text-gray-900 dark:text-white">{playlistToDelete.name}</span>"? 
@@ -168,8 +187,7 @@ const DisplayPlaylists = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
     </div>
   );

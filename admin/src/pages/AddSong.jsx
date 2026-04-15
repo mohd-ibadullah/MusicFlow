@@ -1,8 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { assets } from "../assets/assets";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { url } from "../App";
+import AdminSelect from "../components/AdminSelect";
+
+const languageOptions = [
+  { value: "Hindi", label: "Hindi" },
+  { value: "English", label: "English" },
+  { value: "Telugu", label: "Telugu" },
+];
 
 const AddSong = () => {
   const [image, setImage] = useState(false);
@@ -20,6 +27,17 @@ const AddSong = () => {
 
   const imageInputRef = useRef(null);
   const songInputRef = useRef(null);
+
+  const albumOptions = useMemo(
+    () => [
+      { value: "none", label: "None (Single)" },
+      ...albumData.map((item) => ({
+        value: item.name,
+        label: item.name,
+      })),
+    ],
+    [albumData]
+  );
 
   const validateFiles = () => {
     if (!image) { toast.error("Please select an image file"); return false; }
@@ -124,107 +142,112 @@ const AddSong = () => {
   }
 
   return (
-    <div className="max-w-2xl animate-fade-in">
-      <h1 className="text-page-title mb-1">Add New Song</h1>
-      <p className="text-page-subtitle mb-8">Upload audio and cover art to your library</p>
+    <div className="w-full max-w-4xl space-y-6 animate-fade-in">
+      <div>
+        <h1 className="text-page-title mb-1">Add New Song</h1>
+        <p className="text-page-subtitle">Upload audio and cover art to your library</p>
+      </div>
 
-      <form onSubmit={onSubmitHandler} className="space-y-7">
-        {/* File uploads */}
-        <div className="flex gap-6 flex-wrap">
-          <div className="space-y-2">
-            <label className="text-label">Audio File *</label>
-            <input ref={songInputRef} onChange={(e) => setSong(e.target.files[0] || false)} type="file" id="song" accept="audio/*" hidden />
-            <label htmlFor="song" className="block transform transition-transform duration-200 active:scale-[0.98] hover:scale-[1.01]">
-              {song ? (
-                <img src={assets.upload_added} className="upload-zone border-emerald-200 shadow-md ring-2 ring-emerald-50/50" alt="Audio" />
-              ) : (
-                <div className="upload-zone flex flex-col items-center justify-center gap-2.5 bg-gray-50/40 border-gray-200/60 shadow-inner">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-gray-400">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l.31-.088m1.144-6.32a9 9 0 11-12.247 9a9 9 0 0112.247-9z" />
-                  </svg>
-                  <span className="text-xs font-semibold text-gray-500">Upload</span>
-                </div>
+      <div className="card-admin p-6 sm:p-7">
+        <form onSubmit={onSubmitHandler} className="space-y-7">
+          {/* File uploads */}
+          <div className="flex gap-6 flex-wrap">
+            <div className="space-y-2">
+              <label className="text-label">Audio File *</label>
+              <input ref={songInputRef} onChange={(e) => setSong(e.target.files[0] || false)} type="file" id="song" accept="audio/*" hidden />
+              <label htmlFor="song" className="block transform transition-transform duration-200 active:scale-[0.98] hover:scale-[1.01]">
+                {song ? (
+                  <img src={assets.upload_added} className="upload-zone border-emerald-200 shadow-md ring-2 ring-emerald-50/50" alt="Audio" />
+                ) : (
+                  <div className="upload-zone flex flex-col items-center justify-center gap-2.5 bg-gray-50/40 border-gray-200/60 shadow-inner">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-gray-400">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l.31-.088m1.144-6.32a9 9 0 11-12.247 9a9 9 0 0112.247-9z" />
+                    </svg>
+                    <span className="text-xs font-semibold text-gray-500">Upload</span>
+                  </div>
+                )}
+              </label>
+              {song && (
+                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                  {song.name} ({(song.size / (1024 * 1024)).toFixed(1)} MB)
+                </p>
               )}
-            </label>
-            {song && (
-              <p className="text-xs text-emerald-600 flex items-center gap-1">
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                {song.name} ({(song.size / (1024 * 1024)).toFixed(1)} MB)
-              </p>
-            )}
-            <p className="text-[11px] text-gray-400">MP3, WAV, FLAC, AAC, OGG · Max 50 MB</p>
-          </div>
+              <p className="text-xs text-gray-500">MP3, WAV, FLAC, AAC, OGG · Max 50 MB</p>
+            </div>
 
-          <div className="space-y-2">
-            <label className="text-label">Cover Art *</label>
-            <input ref={imageInputRef} onChange={(e) => setImage(e.target.files[0] || false)} type="file" id="image" accept="image/*" hidden />
-            <label htmlFor="image" className="block transform transition-transform duration-200 active:scale-[0.98] hover:scale-[1.01]">
-              {image ? (
-                <img src={URL.createObjectURL(image)} className="upload-zone shadow-md ring-2 ring-blue-50/50" alt="Cover" />
-              ) : (
-                <div className="upload-zone flex flex-col items-center justify-center gap-2.5 bg-gray-50/40 border-gray-200/60 shadow-inner">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-gray-400">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
-                  </svg>
-                  <span className="text-xs font-semibold text-gray-500">Upload</span>
-                </div>
+            <div className="space-y-2">
+              <label className="text-label">Cover Art *</label>
+              <input ref={imageInputRef} onChange={(e) => setImage(e.target.files[0] || false)} type="file" id="image" accept="image/*" hidden />
+              <label htmlFor="image" className="block transform transition-transform duration-200 active:scale-[0.98] hover:scale-[1.01]">
+                {image ? (
+                  <img src={URL.createObjectURL(image)} className="upload-zone shadow-md ring-2 ring-blue-50/50" alt="Cover" />
+                ) : (
+                  <div className="upload-zone flex flex-col items-center justify-center gap-2.5 bg-gray-50/40 border-gray-200/60 shadow-inner">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-gray-400">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                    </svg>
+                    <span className="text-xs font-semibold text-gray-500">Upload</span>
+                  </div>
+                )}
+              </label>
+              {image && (
+                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                  {image.name} ({(image.size / (1024 * 1024)).toFixed(1)} MB)
+                </p>
               )}
-            </label>
-            {image && (
-              <p className="text-xs text-emerald-600 flex items-center gap-1">
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                {image.name} ({(image.size / (1024 * 1024)).toFixed(1)} MB)
-              </p>
-            )}
-            <p className="text-[11px] text-gray-400">JPEG, PNG, WebP · Max 5 MB</p>
+              <p className="text-xs text-gray-500">JPEG, PNG, WebP · Max 5 MB</p>
+            </div>
           </div>
-        </div>
 
-        {/* Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div>
-            <label className="text-label">Song Name *</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className="input-admin" placeholder="Enter song name" required />
+          {/* Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="text-label">Song Name *</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} className="input-admin" placeholder="Enter song name" required />
+            </div>
+            <div>
+              <label className="text-label">Artist *</label>
+              <input value={artist} onChange={(e) => setArtist(e.target.value)} className="input-admin" placeholder="Artist name" required />
+            </div>
           </div>
-          <div>
-            <label className="text-label">Artist *</label>
-            <input value={artist} onChange={(e) => setArtist(e.target.value)} className="input-admin" placeholder="Artist name" required />
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div>
-            <label className="text-label">Album</label>
-            <select value={album} onChange={(e) => setAlbum(e.target.value)} className="select-admin" disabled={albumsLoading}>
-              <option value="none">None (Single)</option>
-              {albumData.map((item) => (
-                <option key={item._id || item.name} value={item.name}>{item.name}</option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="text-label">Album</label>
+              <AdminSelect
+                value={album}
+                onChange={setAlbum}
+                options={albumOptions}
+                disabled={albumsLoading}
+                placeholder={albumsLoading ? "Loading albums..." : "Select album"}
+              />
+            </div>
+            <div>
+              <label className="text-label">Language *</label>
+              <AdminSelect
+                value={language}
+                onChange={setLanguage}
+                options={languageOptions}
+              />
+            </div>
           </div>
+
           <div>
-            <label className="text-label">Language *</label>
-            <select value={language} onChange={(e) => setLanguage(e.target.value)} className="select-admin">
-              <option value="Hindi">Hindi</option>
-              <option value="English">English</option>
-              <option value="Telugu">Telugu</option>
-            </select>
+            <label className="text-label">Description *</label>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} className="input-admin" placeholder="A brief description of the song" required />
           </div>
-        </div>
 
-        <div>
-          <label className="text-label">Description *</label>
-          <input value={description} onChange={(e) => setDescription(e.target.value)} className="input-admin" placeholder="A brief description of the song" required />
-        </div>
-
-        <button
-          type="submit"
-          className="btn-admin-primary"
-          disabled={!song || !image || !name.trim() || !description.trim() || !artist.trim() || !language || loading}
-        >
-          Add Song
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="btn-admin-primary"
+            disabled={!song || !image || !name.trim() || !description.trim() || !artist.trim() || !language || loading}
+          >
+            Add Song
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

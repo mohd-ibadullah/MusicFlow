@@ -6,11 +6,15 @@ import SongCard from "./SongCard";
 import SkeletonLoader from "./SkeletonLoader";
 import { useToast } from "../context/ThemeContext";
 import { usePlayer } from "../context/PlayerContext";
+import { useAuth } from "../context/AuthContext";
+
+const RECOMMENDATION_LIMIT = 50;
 
 const RecommendedSongsPage = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { playWithId, recommendations: contextRecommendations } = usePlayer();
+  const { isAuthenticated, user } = useAuth();
   const [recommendations, setRecommendations] = useState(contextRecommendations || []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -23,12 +27,18 @@ const RecommendedSongsPage = () => {
       try {
         setIsLoading(true);
         setError(null);
-        const res = await axios.get(`${apiBase}/api/song/recommendations`);
+        const authUserId = user?._id || user?.id || null;
+        const endpoint =
+          isAuthenticated && authUserId
+            ? `${apiBase}/api/ai/recommendations?limit=${RECOMMENDATION_LIMIT}`
+            : `${apiBase}/api/song/recommendations`;
+
+        const res = await axios.get(endpoint);
         if (cancelled) return;
         const data = Array.isArray(res.data?.recommendations)
           ? res.data.recommendations
           : [];
-        setRecommendations(data.slice(0, 50));
+        setRecommendations(data.slice(0, RECOMMENDATION_LIMIT));
       } catch (err) {
         if (cancelled) return;
         console.error("RecommendedSongsPage fetch error:", err);
@@ -47,7 +57,7 @@ const RecommendedSongsPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [apiBase]);
+  }, [apiBase, isAuthenticated, user]);
 
   const hasSongs = useMemo(
     () => Array.isArray(recommendations) && recommendations.length > 0,
@@ -97,10 +107,10 @@ const RecommendedSongsPage = () => {
             </svg>
           </button>
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
+            <h1 className="text-h1 text-gray-900 dark:text-gray-100">
               Recommended For You
             </h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-base text-gray-600 dark:text-gray-400 mt-1">
               {hasSongs
                 ? `${recommendations.length} recommended ${
                     recommendations.length === 1 ? "song" : "songs"

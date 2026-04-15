@@ -107,6 +107,52 @@ body.dark {
   @apply hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100;
 }
 
+.panel-soft {
+  @apply rounded-2xl border border-gray-200/80 dark:border-gray-700/70 bg-white/90 dark:bg-gray-800/85 shadow-sm;
+}
+
+.input-search-soft {
+  @apply w-full pl-12 pr-4 py-3 rounded-xl text-[15px] text-gray-900 dark:text-gray-100;
+  @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600;
+  @apply placeholder-gray-500 dark:placeholder-gray-400 outline-none transition-all duration-200;
+  @apply focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400;
+}
+
+.tabs-shell {
+  @apply inline-flex flex-wrap items-center gap-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1;
+}
+
+.tab-chip {
+  @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200;
+  @apply text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100;
+}
+
+.tab-chip-active {
+  @apply bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm;
+}
+
+.dropdown-trigger-pro {
+  @apply w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl;
+  @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600;
+  @apply text-[13px] font-semibold text-gray-800 dark:text-gray-100 shadow-sm;
+  @apply hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md;
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500/40;
+}
+
+.dropdown-menu-pro {
+  @apply absolute z-50 w-full mt-2 overflow-hidden rounded-xl;
+  @apply border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-xl;
+}
+
+.dropdown-item-pro {
+  @apply w-full text-left px-4 py-2.5 text-sm transition-colors duration-150;
+  @apply text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700;
+}
+
+.dropdown-item-pro-active {
+  @apply bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold;
+}
+
 /* Arrow / nav icon button - consistent across navbar and section pagination */
 .btn-arrow {
   @apply w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;

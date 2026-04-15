@@ -6,7 +6,8 @@ import {
   Disc, 
   LayoutGrid, 
   BarChart3, 
-  Library 
+  Library,
+  Sparkles
 } from "lucide-react";
 import { assets } from "../assets/assets.js";
 
@@ -16,11 +17,12 @@ const navItems = [
   { to: "/add-album", icon: Library, label: "New Album" },
   { to: "/list-album", icon: Disc, label: "Collections" },
   { to: "/analytics", icon: BarChart3, label: "Impact" },
+  { to: "/loop-diagnosis", icon: Sparkles, label: "Loop Diagnosis" },
 ];
 
 const SideBar = () => {
   return (
-    <aside className="bg-gray-900 min-h-screen w-16 sm:w-56 flex flex-col border-r border-gray-800/60 transition-all duration-300">
+    <aside className="bg-gray-900 h-screen w-16 sm:w-56 flex flex-col border-r border-gray-800/60 transition-all duration-300 sticky top-0 shrink-0 overflow-hidden">
       {/* Branding */}
       <div className="px-4 py-5 flex items-center gap-2.5 border-b border-gray-800/40">
         <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/10">
@@ -43,14 +45,14 @@ const SideBar = () => {
                 `sidebar-link transition-all duration-300 group flex items-center gap-3 px-4 py-3 rounded-xl ${
                   isActive 
                     ? "bg-blue-600/10 text-white border-l-4 border-blue-500 shadow-lg shadow-blue-500/5 active-sidebar-link" 
-                    : "text-gray-400 hover:text-white hover:bg-white/5 hover:translate-x-1"
+                    : "text-gray-300 hover:text-white hover:bg-white/5 hover:translate-x-1"
                 }`
               }
             >
               <div className={`shrink-0 transition-colors duration-200`}>
                 <Icon className="w-5 h-5" strokeWidth={2.25} />
               </div>
-              <span className="hidden sm:block font-semibold tracking-tight">{item.label}</span>
+              <span className="hidden sm:block font-semibold tracking-tight text-[15px]">{item.label}</span>
             </NavLink>
           );
         })}

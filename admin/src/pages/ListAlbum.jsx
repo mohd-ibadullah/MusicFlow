@@ -1,14 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { url } from "../App";
 import { toast } from "react-toastify";
 import { Search, RefreshCcw, Library, Trash2 } from "lucide-react";
 import DeleteModal from "../components/DeleteModal";
+import { io as createSocket } from "socket.io-client";
+
+const REALTIME_EVENT_DEDUP_TTL_MS = 120000;
 
 const ListAlbum = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const socketRef = useRef(null);
+  const processedRealtimeEventIdsRef = useRef(new Map());
 
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState({
@@ -17,6 +22,61 @@ const ListAlbum = () => {
     name: null,
     loading: false
   });
+
+  const unwrapRealtimePayload = useCallback((eventEnvelope) => {
+    if (eventEnvelope && typeof eventEnvelope === "object" && eventEnvelope.payload) {
+      return eventEnvelope.payload;
+    }
+    return eventEnvelope;
+  }, []);
+
+  const shouldProcessRealtimeEvent = useCallback((eventEnvelope) => {
+    const eventId = eventEnvelope?.eventId;
+    if (!eventId) return true;
+
+    const now = Date.now();
+    for (const [id, expiresAt] of processedRealtimeEventIdsRef.current.entries()) {
+      if (!expiresAt || expiresAt <= now) {
+        processedRealtimeEventIdsRef.current.delete(id);
+      }
+    }
+
+    const expiresAt = processedRealtimeEventIdsRef.current.get(eventId);
+    if (expiresAt && expiresAt > now) return false;
+
+    processedRealtimeEventIdsRef.current.set(eventId, now + REALTIME_EVENT_DEDUP_TTL_MS);
+    return true;
+  }, []);
+
+  const upsertAlbum = useCallback((album) => {
+    if (!album?._id) return;
+
+    setData((prev) => {
+      const current = Array.isArray(prev) ? prev : [];
+      const albumId = album._id.toString();
+      const existingIndex = current.findIndex((item) => item?._id?.toString?.() === albumId);
+
+      if (existingIndex === -1) {
+        const next = [album, ...current];
+        return next.sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0));
+      }
+
+      const next = [...current];
+      next[existingIndex] = { ...next[existingIndex], ...album };
+      return next;
+    });
+  }, []);
+
+  const removeAlbumById = useCallback((albumId) => {
+    if (!albumId) return;
+
+    const normalizedId = albumId.toString();
+    setData((prev) =>
+      (Array.isArray(prev) ? prev : []).filter(
+        (album) => album?._id?.toString?.() !== normalizedId,
+      ),
+    );
+  }, []);
 
   const fetchAlbums = async () => {
     try {
@@ -49,7 +109,7 @@ const ListAlbum = () => {
       if (response.data.success) {
         toast.success(`"${name}" deleted`);
         setDeleteModal({ isOpen: false, id: null, name: null, loading: false });
-        await fetchAlbums();
+        removeAlbumById(id);
       } else {
         toast.error(response.data.message || "Failed to delete album");
         setDeleteModal(prev => ({ ...prev, loading: false }));
@@ -79,6 +139,62 @@ const ListAlbum = () => {
 
   useEffect(() => { fetchAlbums(); }, []);
 
+  useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    const socketTarget = url || undefined;
+
+    const socket = socketTarget
+      ? createSocket(socketTarget, {
+          path: "/socket.io",
+          transports: ["polling", "websocket"],
+          auth: token ? { token } : undefined,
+          withCredentials: true,
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 8000,
+          timeout: 10000,
+        })
+      : createSocket({
+          path: "/socket.io",
+          transports: ["polling", "websocket"],
+          auth: token ? { token } : undefined,
+          withCredentials: true,
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 8000,
+          timeout: 10000,
+        });
+
+    socketRef.current = socket;
+
+    socket.on("connect_error", (err) => {
+      console.warn("[Admin Albums] Socket connection error:", err.message);
+    });
+
+    socket.on("album:created", (eventEnvelope) => {
+      if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+      const payload = unwrapRealtimePayload(eventEnvelope);
+      if (payload?.album) {
+        upsertAlbum(payload.album);
+      }
+    });
+
+    socket.on("album:deleted", (eventEnvelope) => {
+      if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+      const payload = unwrapRealtimePayload(eventEnvelope);
+      removeAlbumById(payload?.albumId);
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [removeAlbumById, shouldProcessRealtimeEvent, unwrapRealtimePayload, upsertAlbum]);
+
   if (loading) {
     return (
       <div className="grid place-items-center min-h-[60vh] animate-fade-in">
@@ -91,9 +207,9 @@ const ListAlbum = () => {
   }
 
   return (
-    <div className="w-full animate-fade-in">
+    <div className="w-full space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-page-title">Albums</h1>
           <p className="text-page-subtitle">
@@ -120,7 +236,7 @@ const ListAlbum = () => {
       </div>
 
       {data.length === 0 ? (
-        <div className="card-admin-alt text-center py-20 px-8">
+        <div className="card-admin text-center py-20 px-8">
           <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner text-gray-300">
             <Library className="w-7 h-7" />
           </div>
@@ -165,7 +281,7 @@ const ListAlbum = () => {
                   </div>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-[11px] font-bold text-gray-400 tracking-tight uppercase leading-none">{formatDate(item.createdAt)}</span>
+                  <span className="text-xs font-semibold text-gray-500 leading-none">{formatDate(item.createdAt)}</span>
                 </div>
                 <div className="col-span-1 text-center">
                   <button

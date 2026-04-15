@@ -9,10 +9,22 @@ import React, {
   useMemo,
 } from "react";
 import axios from "axios";
+import { io as createSocket } from "socket.io-client";
 import { useToast } from "./ThemeContext";
 import { useAuth } from "./AuthContext";
 
 export const PlayerContext = createContext();
+
+const PLAY_COUNT_SAME_SONG_DEDUP_MS = 10000;
+const AI_RECOMMENDATION_LIMIT = 50;
+const REALTIME_EVENT_DEDUP_TTL_MS = 120000;
+
+const unwrapRealtimePayload = (eventEnvelope) => {
+  if (eventEnvelope && typeof eventEnvelope === "object" && eventEnvelope.payload) {
+    return eventEnvelope.payload;
+  }
+  return eventEnvelope;
+};
 
 const PlayerContextProvider = (props) => {
   const audioRef = useRef();
@@ -23,8 +35,15 @@ const PlayerContextProvider = (props) => {
   const playStatusRef = useRef(false);
   const userRef = useRef(user);
   const socketRef = useRef(null);
+  const songsDataRef = useRef([]);
   // Unique listener ID (works for both logged-in users and guests)
   const listenerIdRef = useRef(null);
+  const processedRealtimeEventIdsRef = useRef(new Map());
+  const recommendationContextRef = useRef({
+    source: null,
+    recommendationRequestId: null,
+    rankBySongId: new Map(),
+  });
 
   useEffect(() => {
     const uid = user?._id ?? user?.id;
@@ -73,6 +92,9 @@ const PlayerContextProvider = (props) => {
   const trackRef = useRef(track);
   // Keep a ref in sync so closures always read the live value
   useEffect(() => { playStatusRef.current = playStatus; }, [playStatus]);
+  useEffect(() => {
+    songsDataRef.current = Array.isArray(songsData) ? songsData : [];
+  }, [songsData]);
   // Sync track to ref
   useEffect(() => { trackRef.current = track; }, [track]);
 
@@ -204,6 +226,138 @@ const PlayerContextProvider = (props) => {
     },
     [themeToast],
   );
+
+  const shouldProcessRealtimeEvent = useCallback((eventEnvelope) => {
+    const eventId = eventEnvelope?.eventId;
+    if (!eventId) return true;
+
+    const now = Date.now();
+    for (const [trackedEventId, expiresAt] of processedRealtimeEventIdsRef.current.entries()) {
+      if (!expiresAt || expiresAt <= now) {
+        processedRealtimeEventIdsRef.current.delete(trackedEventId);
+      }
+    }
+
+    if (processedRealtimeEventIdsRef.current.has(eventId)) {
+      return false;
+    }
+
+    processedRealtimeEventIdsRef.current.set(
+      eventId,
+      now + REALTIME_EVENT_DEDUP_TTL_MS,
+    );
+
+    return true;
+  }, []);
+
+  const upsertSongInState = useCallback((songPayload) => {
+    const songId = songPayload?._id?.toString?.() || songPayload?._id;
+    if (!songId) return;
+
+    setSongsData((prev) => {
+      const current = Array.isArray(prev) ? prev : [];
+      const index = current.findIndex((song) => song?._id?.toString?.() === songId.toString());
+      if (index === -1) {
+        return [songPayload, ...current];
+      }
+
+      const next = [...current];
+      next[index] = { ...next[index], ...songPayload };
+      return next;
+    });
+  }, []);
+
+  const removeSongFromState = useCallback((songId) => {
+    const normalizedSongId = songId?.toString?.() || songId;
+    if (!normalizedSongId) return;
+
+    setSongsData((prev) =>
+      (Array.isArray(prev) ? prev : []).filter(
+        (song) => song?._id?.toString?.() !== normalizedSongId,
+      ),
+    );
+
+    setTrendingSongs((prev) =>
+      (Array.isArray(prev) ? prev : []).filter(
+        (song) => song?._id?.toString?.() !== normalizedSongId,
+      ),
+    );
+
+    setRecommendations((prev) =>
+      (Array.isArray(prev) ? prev : []).filter(
+        (song) => song?._id?.toString?.() !== normalizedSongId,
+      ),
+    );
+
+    setLikedSongs((prev) =>
+      (Array.isArray(prev) ? prev : []).filter((song) => {
+        if (typeof song === "string") return song !== normalizedSongId;
+        return song?._id?.toString?.() !== normalizedSongId;
+      }),
+    );
+
+    setRecentlyPlayed((prev) =>
+      (Array.isArray(prev) ? prev : []).filter(
+        (song) => song?._id?.toString?.() !== normalizedSongId,
+      ),
+    );
+  }, []);
+
+  const upsertAlbumInState = useCallback((albumPayload) => {
+    const albumId = albumPayload?._id?.toString?.() || albumPayload?._id;
+    if (!albumId) return;
+
+    setAlbumsData((prev) => {
+      const current = Array.isArray(prev) ? prev : [];
+      const index = current.findIndex((album) => album?._id?.toString?.() === albumId.toString());
+      if (index === -1) {
+        return [albumPayload, ...current];
+      }
+
+      const next = [...current];
+      next[index] = { ...next[index], ...albumPayload };
+      return next;
+    });
+  }, []);
+
+  const removeAlbumFromState = useCallback((albumId) => {
+    const normalizedAlbumId = albumId?.toString?.() || albumId;
+    if (!normalizedAlbumId) return;
+
+    setAlbumsData((prev) =>
+      (Array.isArray(prev) ? prev : []).filter(
+        (album) => album?._id?.toString?.() !== normalizedAlbumId,
+      ),
+    );
+  }, []);
+
+  const upsertPlaylistInState = useCallback((playlistPayload) => {
+    const playlistId = playlistPayload?._id?.toString?.() || playlistPayload?._id;
+    if (!playlistId) return;
+
+    setPlaylists((prev) => {
+      const current = Array.isArray(prev) ? prev : [];
+      const index = current.findIndex((playlist) => playlist?._id?.toString?.() === playlistId.toString());
+      if (index === -1) {
+        return [playlistPayload, ...current];
+      }
+
+      const next = [...current];
+      next[index] = { ...next[index], ...playlistPayload };
+      return next;
+    });
+  }, []);
+
+  const removePlaylistFromState = useCallback((playlistId) => {
+    const normalizedPlaylistId = playlistId?.toString?.() || playlistId;
+    if (!normalizedPlaylistId) return;
+
+    setPlaylists((prev) =>
+      (Array.isArray(prev) ? prev : []).filter(
+        (playlist) => playlist?._id?.toString?.() !== normalizedPlaylistId,
+      ),
+    );
+  }, []);
 
   // Emit listener status to socket (reusable)
   const emitStartedListening = useCallback(() => {
@@ -404,7 +558,36 @@ const PlayerContextProvider = (props) => {
     [playlists, playWithId, showToast],
   );
 
-  const next = useCallback(() => {
+  const next = useCallback((options = {}) => {
+    const reason = options?.reason || "auto";
+    const currentTrack = trackRef.current;
+
+    if (reason === "manual" && isAuthenticated && currentTrack?._id) {
+      const recommendationContext = recommendationContextRef.current;
+      const currentTrackId = currentTrack._id.toString();
+      const hasRankContext =
+        recommendationContext.rankBySongId instanceof Map &&
+        recommendationContext.rankBySongId.has(currentTrackId);
+
+      const rank = hasRankContext
+        ? recommendationContext.rankBySongId.get(currentTrackId)
+        : null;
+
+      axios
+        .post(`${url}/api/ai/feedback`, {
+          songId: currentTrack._id,
+          interactionType: "skip",
+          source: hasRankContext ? "player_next_button" : "player_next_button_unranked",
+          recommendationRequestId: hasRankContext
+            ? recommendationContext.recommendationRequestId || null
+            : null,
+          rank,
+        })
+        .catch((error) => {
+          console.warn("Skip feedback logging failed:", error.message);
+        });
+    }
+
     const safePlaylist = Array.isArray(currentPlaylist) ? currentPlaylist : [];
     if (safePlaylist.length === 0) return;
 
@@ -451,6 +634,8 @@ const PlayerContextProvider = (props) => {
     currentPlaylistIndex,
     isShuffled,
     addToRecentlyPlayed,
+    isAuthenticated,
+    url,
   ]);
 
   const previous = useCallback(() => {
@@ -723,8 +908,6 @@ const PlayerContextProvider = (props) => {
               prev.map(p => p._id === tempId ? response.data.playlist : p)
             );
           }
-          // Fetch authoritative state in background
-          getPlaylistsData();
           showToast("Playlist created successfully", "success");
           return { success: true };
         } else {
@@ -771,16 +954,23 @@ const PlayerContextProvider = (props) => {
         return { success: false };
       }
 
+      const previousPlaylists = playlists;
+      setPlaylists((prev) =>
+        (Array.isArray(prev) ? prev : []).filter(
+          (playlist) => playlist?._id?.toString?.() !== playlistId,
+        ),
+      );
+
       try {
         const response = await axios.delete(
           `${url}/api/playlist/delete/${playlistId}`,
         );
 
         if (response.data.success) {
-          await getPlaylistsData();
           showToast("Playlist deleted successfully", "success");
           return { success: true };
         } else {
+          setPlaylists(previousPlaylists);
           showToast(
             response.data.message || "Failed to delete playlist",
             "error",
@@ -789,13 +979,14 @@ const PlayerContextProvider = (props) => {
         }
       } catch (error) {
         console.error("Error deleting playlist:", error);
+        setPlaylists(previousPlaylists);
         const message =
           error.response?.data?.message || "Failed to delete playlist";
         showToast(message, "error");
         return { success: false, message };
       }
     },
-    [showToast, isAuthenticated],
+    [showToast, isAuthenticated, playlists],
   );
 
   const addSongToPlaylist = useCallback(
@@ -821,6 +1012,7 @@ const PlayerContextProvider = (props) => {
       }
 
       try {
+        const previousPlaylists = playlists;
         // Find the song to add
         const songToAdd = songsData.find((song) => song._id === songId);
         if (!songToAdd) {
@@ -868,40 +1060,20 @@ const PlayerContextProvider = (props) => {
           return { success: true };
         } else {
           // Revert optimistic update on failure
-          try {
-            const response = await axios.get(`${url}/api/playlist/list`);
-            if (response.data.success) {
-              const pls = Array.isArray(response.data.playlists)
-                ? response.data.playlists
-                : [];
-              setPlaylists(pls);
-            }
-          } catch (refreshError) {
-            console.error("Error refreshing playlists:", refreshError);
-          }
+          setPlaylists(previousPlaylists);
           showToast(response.data.message || "Failed to add song", "error");
           return { success: false };
         }
       } catch (error) {
         console.error("Error adding song to playlist:", error);
         // Revert optimistic update on error
-        try {
-          const response = await axios.get(`${url}/api/playlist/list`);
-          if (response.data.success) {
-            const pls = Array.isArray(response.data.playlists)
-              ? response.data.playlists
-              : [];
-            setPlaylists(pls);
-          }
-        } catch (refreshError) {
-          console.error("Error refreshing playlists:", refreshError);
-        }
+        setPlaylists(playlists);
         const message = error.response?.data?.message || "Failed to add song";
         showToast(message, "error");
         return { success: false, message };
       }
     },
-    [showToast, songsData, isAuthenticated],
+    [showToast, songsData, isAuthenticated, playlists],
   );
 
   const removeSongFromPlaylist = useCallback(
@@ -927,6 +1099,7 @@ const PlayerContextProvider = (props) => {
       }
 
       try {
+        const previousPlaylists = playlists;
         // Optimistically update the local state first for instant UI update
         setPlaylists((prevPlaylists) =>
           prevPlaylists.map((playlist) => {
@@ -961,41 +1134,21 @@ const PlayerContextProvider = (props) => {
           return { success: true };
         } else {
           // Revert optimistic update on failure
-          try {
-            const response = await axios.get(`${url}/api/playlist/list`);
-            if (response.data.success) {
-              const pls = Array.isArray(response.data.playlists)
-                ? response.data.playlists
-                : [];
-              setPlaylists(pls);
-            }
-          } catch (refreshError) {
-            console.error("Error refreshing playlists:", refreshError);
-          }
+          setPlaylists(previousPlaylists);
           showToast(response.data.message || "Failed to remove song", "error");
           return { success: false };
         }
       } catch (error) {
         console.error("Error removing song from playlist:", error);
         // Revert optimistic update on error
-        try {
-          const response = await axios.get(`${url}/api/playlist/list`);
-          if (response.data.success) {
-            const pls = Array.isArray(response.data.playlists)
-              ? response.data.playlists
-              : [];
-            setPlaylists(pls);
-          }
-        } catch (refreshError) {
-          console.error("Error refreshing playlists:", refreshError);
-        }
+        setPlaylists(playlists);
         const message =
           error.response?.data?.message || "Failed to remove song";
         showToast(message, "error");
         return { success: false, message };
       }
     },
-    [showToast, isAuthenticated],
+    [showToast, isAuthenticated, playlists],
   );
 
   // Data fetching
@@ -1144,45 +1297,92 @@ const PlayerContextProvider = (props) => {
   // Fetch recommendations and trending
   const fetchRecommendationsAndTrending = useCallback(async () => {
     try {
-      const [recRes, trendRes] = await Promise.all([
-        axios
-          .get(`${url}/api/song/recommendations`)
-          .catch(() => ({ data: {} })),
-        axios
-          .get(`${url}/api/song/trending?limit=10`)
-          .catch(() => ({ data: {} })),
-      ]);
-
       let recs = [];
-      if (recRes.data?.success && Array.isArray(recRes.data.recommendations)) {
-        recs = recRes.data.recommendations;
-      } else {
-        // Failsafe fallback: use top songs by playCount from /api/song/list
+      let recommendationRequestId = null;
+      let recommendationSource = null;
+
+      const authUserId = userRef.current?._id || userRef.current?.id || null;
+
+      if (isAuthenticated && authUserId) {
         try {
-          const songsRes = await axios
-            .get(`${url}/api/song/list`)
-            .catch(() => ({ data: {} }));
-          const songs =
-            Array.isArray(songsRes.data?.data) && songsRes.data.data.length > 0
-              ? songsRes.data.data
-              : [];
-          recs = songs
-            .slice()
-            .sort((a, b) => (b.playCount || 0) - (a.playCount || 0))
-            .slice(0, 10);
+          const aiRes = await axios.get(`${url}/api/ai/recommendations`, {
+            params: { limit: AI_RECOMMENDATION_LIMIT },
+          });
+
+          if (aiRes.data?.success && Array.isArray(aiRes.data.recommendations)) {
+            recs = aiRes.data.recommendations;
+            recommendationRequestId = aiRes.data.recommendationRequestId || null;
+            recommendationSource = "ai-endpoint";
+          }
+        } catch (aiErr) {
+          console.warn("AI recommendations fetch failed:", aiErr.message);
+        }
+      }
+
+      if (recs.length === 0) {
+        try {
+          const recRes = await axios.get(`${url}/api/song/recommendations`);
+
+          if (recRes.data?.success && Array.isArray(recRes.data.recommendations)) {
+            recs = recRes.data.recommendations;
+          } else {
+            // Failsafe fallback: use top songs by playCount from /api/song/list
+            const songsRes = await axios
+              .get(`${url}/api/song/list`)
+              .catch(() => ({ data: {} }));
+
+            const songs =
+              Array.isArray(songsRes.data?.data) && songsRes.data.data.length > 0
+                ? songsRes.data.data
+                : [];
+
+            recs = songs
+              .slice()
+              .sort((a, b) => (b.playCount || 0) - (a.playCount || 0))
+              .slice(0, AI_RECOMMENDATION_LIMIT);
+          }
         } catch (fallbackErr) {
           console.warn("Fallback recommendations failed:", fallbackErr.message);
         }
       }
-      setRecommendations(Array.isArray(recs) ? recs : []);
 
-      if (trendRes.data?.success && Array.isArray(trendRes.data.data)) {
-        setTrendingSongs(trendRes.data.data.slice(0, 10));
+      const normalizedRecs = Array.isArray(recs)
+        ? recs.slice(0, AI_RECOMMENDATION_LIMIT)
+        : [];
+      setRecommendations(normalizedRecs);
+
+      const rankBySongId = new Map();
+      for (let index = 0; index < normalizedRecs.length; index += 1) {
+        const song = normalizedRecs[index];
+        const songId = song?._id?.toString?.() || song?._id;
+        if (songId) {
+          rankBySongId.set(songId.toString(), index);
+        }
+      }
+
+      recommendationContextRef.current = {
+        source: recommendationSource,
+        recommendationRequestId,
+        rankBySongId,
+      };
+
+      try {
+        const trendRes = await axios.get(`${url}/api/song/trending?limit=10`);
+        if (trendRes.data?.success && Array.isArray(trendRes.data.data)) {
+          setTrendingSongs(trendRes.data.data.slice(0, 10));
+        }
+      } catch (trendErr) {
+        console.warn("Trending fetch failed:", trendErr.message);
       }
     } catch (e) {
       console.warn("Recommendations/trending fetch failed:", e.message);
+      recommendationContextRef.current = {
+        source: null,
+        recommendationRequestId: null,
+        rankBySongId: new Map(),
+      };
     }
-  }, []);
+  }, [isAuthenticated]);
 
   // Initialize data on mount and when authentication changes
   useEffect(() => {
@@ -1208,53 +1408,355 @@ const PlayerContextProvider = (props) => {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      try {
-        const { io } = await import("socket.io-client");
-        const socket = io({ path: "/socket.io", transports: ["polling", "websocket"] });
-        if (!mounted) {
-          socket.disconnect();
+    const token = localStorage.getItem("token");
+    const socketTarget = url || undefined;
+
+    try {
+      const socket = socketTarget
+        ? createSocket(socketTarget, {
+            path: "/socket.io",
+            transports: ["polling", "websocket"],
+            auth: token ? { token } : undefined,
+            withCredentials: true,
+            reconnection: true,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 8000,
+            timeout: 10000,
+          })
+        : createSocket({
+            path: "/socket.io",
+            transports: ["polling", "websocket"],
+            auth: token ? { token } : undefined,
+            withCredentials: true,
+            reconnection: true,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 8000,
+            timeout: 10000,
+          });
+
+      if (!mounted) {
+        socket.disconnect();
+        return;
+      }
+
+      socketRef.current = socket;
+
+      const patchSongMetrics = (payload, interactionType) => {
+        const songId = payload?.songId?.toString?.() || payload?.songId;
+        if (!songId) return;
+
+        setSongsData((prev) => {
+          const current = Array.isArray(prev) ? prev : [];
+          const index = current.findIndex((song) => song?._id?.toString?.() === songId.toString());
+          if (index === -1) return current;
+
+          const next = [...current];
+          const target = { ...next[index] };
+
+          if (interactionType === "played") {
+            target.playCount =
+              Number.isFinite(payload?.playCount)
+                ? payload.playCount
+                : (Number(target.playCount) || 0) + 1;
+          }
+
+          if (interactionType === "liked" || interactionType === "unliked") {
+            target.likeCount =
+              Number.isFinite(payload?.likeCount)
+                ? payload.likeCount
+                : Math.max(
+                    0,
+                    (Number(target.likeCount) || 0) +
+                      (interactionType === "liked" ? 1 : -1),
+                  );
+          }
+
+          next[index] = target;
+          return next;
+        });
+
+        setTrendingSongs((prev) => {
+          const current = Array.isArray(prev) ? prev : [];
+          const index = current.findIndex((song) => song?._id?.toString?.() === songId.toString());
+          if (index === -1) return current;
+
+          const next = [...current];
+          const target = { ...next[index] };
+
+          if (interactionType === "played") {
+            target.playCount =
+              Number.isFinite(payload?.playCount)
+                ? payload.playCount
+                : (Number(target.playCount) || 0) + 1;
+            next[index] = target;
+            return next.sort((a, b) => (Number(b?.playCount) || 0) - (Number(a?.playCount) || 0));
+          }
+
+          if (interactionType === "liked" || interactionType === "unliked") {
+            target.likeCount =
+              Number.isFinite(payload?.likeCount)
+                ? payload.likeCount
+                : Math.max(
+                    0,
+                    (Number(target.likeCount) || 0) +
+                      (interactionType === "liked" ? 1 : -1),
+                  );
+            next[index] = target;
+            return next;
+          }
+
+          return current;
+        });
+
+        setRecommendations((prev) => {
+          const current = Array.isArray(prev) ? prev : [];
+          const index = current.findIndex((song) => song?._id?.toString?.() === songId.toString());
+          if (index === -1) return current;
+
+          const next = [...current];
+          const target = { ...next[index] };
+          if (interactionType === "liked" || interactionType === "unliked") {
+            target.likeCount =
+              Number.isFinite(payload?.likeCount)
+                ? payload.likeCount
+                : Math.max(
+                    0,
+                    (Number(target.likeCount) || 0) +
+                      (interactionType === "liked" ? 1 : -1),
+                  );
+          }
+
+          next[index] = target;
+          return next;
+        });
+      };
+
+      const handleListenersCount = (eventOrCount) => {
+        const payload = unwrapRealtimePayload(eventOrCount);
+        const count = typeof payload === "number" ? payload : payload?.count;
+        const value = typeof count === "number" ? Math.max(0, count) : 0;
+        setActiveListenersCount(value);
+      };
+
+      const handleSongPlayed = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (!payload?.songId) return;
+
+        patchSongMetrics(payload, "played");
+
+        setLiveListening((prev) => {
+          const nextItem = {
+            ...payload,
+            at: Date.now(),
+          };
+
+          const current = Array.isArray(prev) ? prev : [];
+          const deduped = current.filter((item) => {
+            const sameUser = item?.userId && payload?.userId && item.userId === payload.userId;
+            const sameSong = item?.songId && payload?.songId && item.songId === payload.songId;
+            return !(sameUser && sameSong);
+          });
+
+          return [nextItem, ...deduped].slice(0, 5);
+        });
+      };
+
+      const handleSongLiked = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        patchSongMetrics(payload, "liked");
+
+        const currentUserId = userRef.current?._id?.toString?.() || userRef.current?.id?.toString?.();
+        if (!currentUserId || payload?.userId?.toString?.() !== currentUserId) return;
+
+        const songId = payload?.songId?.toString?.() || payload?.songId;
+        if (!songId) return;
+
+        setLikedSongs((prev) => {
+          const current = Array.isArray(prev) ? prev : [];
+          const alreadyLiked = current.some((song) =>
+            typeof song === "string"
+              ? song === songId
+              : song?._id?.toString?.() === songId.toString(),
+          );
+
+          if (alreadyLiked) return current;
+
+          const songFromState = songsDataRef.current.find(
+            (song) => song?._id?.toString?.() === songId.toString(),
+          );
+          const hydratedSong = songFromState
+            ? { ...songFromState, likeCount: payload?.likeCount ?? songFromState.likeCount }
+            : {
+                _id: songId,
+                name: payload?.songName || "Unknown Song",
+                artist: payload?.artist || "Unknown",
+                likeCount: payload?.likeCount ?? 1,
+              };
+
+          return [hydratedSong, ...current];
+        });
+      };
+
+      const handleSongUnliked = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        patchSongMetrics(payload, "unliked");
+
+        const currentUserId = userRef.current?._id?.toString?.() || userRef.current?.id?.toString?.();
+        if (!currentUserId || payload?.userId?.toString?.() !== currentUserId) return;
+
+        const songId = payload?.songId?.toString?.() || payload?.songId;
+        if (!songId) return;
+
+        setLikedSongs((prev) =>
+          (Array.isArray(prev) ? prev : []).filter((song) =>
+            typeof song === "string"
+              ? song !== songId
+              : song?._id?.toString?.() !== songId.toString(),
+          ),
+        );
+      };
+
+      const handlePlaylistEvent = (eventEnvelope, mode) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        const currentUserId = userRef.current?._id?.toString?.() || userRef.current?.id?.toString?.();
+
+        if (!currentUserId) return;
+        if (payload?.userId?.toString?.() !== currentUserId) return;
+
+        if (mode === "deleted") {
+          removePlaylistFromState(payload?.playlistId);
           return;
         }
-        socketRef.current = socket;
 
-        socket.on("connect", () => {
-          isSocketConnectedRef.current = true;
-          socket.emit("get_listeners");
-        });
+        if (payload?.playlist) {
+          upsertPlaylistInState(payload.playlist);
+        }
+      };
 
-        socket.on("disconnect", () => {
-          isSocketConnectedRef.current = false;
-        });
+      const handleAlbumCreated = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (payload?.album) upsertAlbumInState(payload.album);
+      };
 
-        socket.on("connect_error", (err) => {
-          console.warn("[Socket] Connection error:", err.message);
-        });
+      const handleAlbumDeleted = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        removeAlbumFromState(payload?.albumId);
+      };
 
-        socket.on("user_listening", (payload) => {
-          setLiveListening((prev) => {
-            const next = [
-              { ...payload, at: Date.now() },
-              ...(prev || []),
-            ].slice(0, 5);
-            return next;
+      const handleSongCreated = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        if (payload?.song) upsertSongInState(payload.song);
+      };
+
+      const handleSongDeleted = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        const deletedSongId = payload?.songId?.toString?.() || payload?.songId;
+        if (!deletedSongId) return;
+
+        removeSongFromState(deletedSongId);
+
+        setPlaylists((prev) =>
+          (Array.isArray(prev) ? prev : []).map((playlist) => ({
+            ...playlist,
+            songs: (Array.isArray(playlist?.songs) ? playlist.songs : []).filter(
+              (song) => song?._id?.toString?.() !== deletedSongId.toString(),
+            ),
+          })),
+        );
+
+        if (trackRef.current?._id?.toString?.() === deletedSongId.toString()) {
+          setTrack(null);
+          setPlayStatus(false);
+        }
+      };
+
+      const handleAiPlaylistGenerated = (eventEnvelope) => {
+        if (!shouldProcessRealtimeEvent(eventEnvelope)) return;
+        const payload = unwrapRealtimePayload(eventEnvelope);
+        const currentUserId = userRef.current?._id?.toString?.() || userRef.current?.id?.toString?.();
+        if (!currentUserId || payload?.userId?.toString?.() !== currentUserId) return;
+        if (payload?.playlist) {
+          upsertPlaylistInState(payload.playlist);
+        }
+      };
+
+      socket.on("connect", () => {
+        isSocketConnectedRef.current = true;
+        socket.emit("get_listeners");
+        if (playStatusRef.current && trackRef.current?._id) {
+          socket.emit("started_listening", {
+            songId: trackRef.current._id,
+            songName: trackRef.current.name,
+            userId:
+              userRef.current?._id ||
+              userRef.current?.id ||
+              localStorage.getItem("uid") ||
+              "anon",
+            userName:
+              userRef.current?.name ||
+              userRef.current?.username ||
+              localStorage.getItem("uname") ||
+              "Anonymous",
+            artist: trackRef.current.artist,
           });
-        });
+        }
+      });
 
-        socket.on("recent_live_events", (eventsPayload) => {
-          if (Array.isArray(eventsPayload)) {
-            setLiveListening(eventsPayload.map(e => ({ ...e, at: Date.now() })));
-          }
-        });
+      socket.on("disconnect", () => {
+        isSocketConnectedRef.current = false;
+      });
 
-        socket.on("users_listening", (count) => {
-          const value = typeof count === "number" ? Math.max(0, count) : 0;
-          setActiveListenersCount(value);
+      socket.on("connect_error", (err) => {
+        console.warn("[Socket] Connection error:", err.message);
+      });
+
+      socket.on("listeners:updated", handleListenersCount);
+      socket.on("users_listening", handleListenersCount);
+      socket.on("song:played", handleSongPlayed);
+      socket.on("song:liked", handleSongLiked);
+      socket.on("song:unliked", handleSongUnliked);
+      socket.on("song:created", handleSongCreated);
+      socket.on("song:deleted", handleSongDeleted);
+      socket.on("album:created", handleAlbumCreated);
+      socket.on("album:deleted", handleAlbumDeleted);
+      socket.on("playlist:created", (eventEnvelope) => handlePlaylistEvent(eventEnvelope, "created"));
+      socket.on("playlist:updated", (eventEnvelope) => handlePlaylistEvent(eventEnvelope, "updated"));
+      socket.on("playlist:deleted", (eventEnvelope) => handlePlaylistEvent(eventEnvelope, "deleted"));
+      socket.on("ai:playlist:generated", handleAiPlaylistGenerated);
+
+      // Legacy compatibility events
+      socket.on("user_listening", (payload) => {
+        setLiveListening((prev) => {
+          const current = Array.isArray(prev) ? prev : [];
+          const deduped = current.filter((item) => {
+            const sameUser = item?.userId && payload?.userId && item.userId === payload.userId;
+            const sameSong = item?.songId && payload?.songId && item.songId === payload.songId;
+            return !(sameUser && sameSong);
+          });
+
+          return [{ ...payload, at: Date.now() }, ...deduped].slice(0, 5);
         });
-      } catch (err) {
-        console.warn("Socket.IO not available:", err.message);
-      }
-    })();
+      });
+
+      socket.on("recent_live_events", (eventsPayload) => {
+        if (Array.isArray(eventsPayload)) {
+          setLiveListening(eventsPayload.map((item) => ({ ...item, at: Date.now() })));
+        }
+      });
+    } catch (err) {
+      console.warn("Socket.IO not available:", err.message);
+    }
+
     return () => {
       mounted = false;
       if (socketRef.current) {
@@ -1263,7 +1765,16 @@ const PlayerContextProvider = (props) => {
         isSocketConnectedRef.current = false;
       }
     };
-  }, [url]);
+  }, [
+    url,
+    removeAlbumFromState,
+    removePlaylistFromState,
+    removeSongFromState,
+    shouldProcessRealtimeEvent,
+    upsertAlbumInState,
+    upsertPlaylistInState,
+    upsertSongInState,
+  ]);
 
   // Audio event handlers
   useEffect(() => {
@@ -1320,7 +1831,6 @@ const PlayerContextProvider = (props) => {
       audioElement.load();
       setPlayStatus(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- volume omitted: changing volume must not reload audio (stops playback)
   }, [track]);
 
   // Memoized context value to prevent unnecessary re-renders
@@ -1444,7 +1954,9 @@ const PlayerContextProvider = (props) => {
             if (currentTrack) {
               const now = Date.now();
               const prev = lastPlayCountedRef.current || {};
-              const sameSongRecently = prev.songId === currentTrack._id && now - (prev.at || 0) < 15000;
+              const sameSongRecently =
+                prev.songId === currentTrack._id &&
+                now - (prev.at || 0) < PLAY_COUNT_SAME_SONG_DEDUP_MS;
               
               if (!sameSongRecently) {
                 lastPlayCountedRef.current = { songId: currentTrack._id, at: now };

@@ -1,71 +1,75 @@
 import React from 'react';
-import { Trash2, AlertTriangle, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Trash2, X } from 'lucide-react';
 
 const DeleteModal = ({ isOpen, onClose, onConfirm, title, message, itemName, loading }) => {
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center sm:px-4">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="fixed top-0 left-0 flex items-center justify-center px-4"
+      style={{ width: '100vw', height: '100dvh', zIndex: 2147483647 }}
+    >
       {/* Overlay with blur effect */}
       <div 
-        className="absolute inset-0 bg-slate-950/40 backdrop-blur-[6px] transition-all duration-300 animate-in fade-in"
+        className="absolute inset-0 bg-slate-950/55 backdrop-blur-md transition-all duration-300 animate-in fade-in"
         onClick={loading ? undefined : onClose}
       ></div>
 
       {/* Modal Content */}
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-[28px] shadow-2xl border border-gray-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
+      <div className="relative w-full max-w-md card-admin-alt overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
         
         {/* Close Button */}
         <button 
           onClick={onClose}
           disabled={loading}
-          className="absolute top-5 right-5 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 transition-colors duration-200"
+          className="absolute top-4 right-4 btn-admin-ghost !p-2"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="p-8">
+        <div className="p-7 sm:p-8">
           {/* Icon Header */}
-          <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-500/10 flex items-center justify-center mb-6">
-            <Trash2 className="w-7 h-7 text-red-500 active:scale-95 transition-transform" />
+          <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center mb-5 border border-red-100">
+            <Trash2 className="w-6 h-6 text-red-500" />
           </div>
 
           {/* Text Content */}
-          <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight mb-3 px-0.5">
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight mb-2">
             {title || 'Delete Item'}
           </h3>
-          <p className="text-base text-gray-500 dark:text-slate-400 leading-relaxed px-0.5">
-            {message || 'Are you sure you want to delete'} <span className="font-bold text-gray-900 dark:text-slate-200">"{itemName}"</span>? 
-            <br />
-            <span className="text-sm opacity-80 mt-2 block">This action is permanent and cannot be reversed.</span>
+          <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+            {message || 'Are you sure you want to delete'} <span className="font-bold text-gray-900">"{itemName}"</span>? 
           </p>
+          <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold mt-3">This action is permanent and cannot be reversed.</p>
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-3 mt-10">
+          <div className="flex flex-col sm:flex-row gap-3 mt-7">
             <button
               onClick={onClose}
               disabled={loading}
-              className="flex-1 px-6 py-3.5 rounded-2xl font-bold text-gray-600 dark:text-slate-300 border-2 border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 hover:border-gray-200 dark:hover:border-slate-700 transition-all duration-200 active:scale-[0.98]"
+              className="flex-1 btn-admin-secondary !py-2.5"
             >
-              Keep it
+              Cancel
             </button>
             <button
               onClick={onConfirm}
               disabled={loading}
-              className="flex-1 px-6 py-3.5 rounded-2xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2"
+              className="flex-1 btn-admin-danger-solid !py-2.5 flex items-center justify-center gap-2"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-white/35 border-t-white rounded-full animate-spin"></div>
               ) : (
-                <>
-                  Confirm Delete
-                </>
+                'Delete'
               )}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

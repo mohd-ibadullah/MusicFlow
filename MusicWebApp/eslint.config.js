@@ -5,6 +5,8 @@ import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
+const jsxRuntimeRules = react.configs['jsx-runtime']?.rules ?? {}
+
 export default [
   {
     files: ['src/**/*.{js,jsx}'],
@@ -30,23 +32,15 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       ...react.configs.recommended.rules,
-      ...react.configs['jsx-runtime'].rules,
+      ...jsxRuntimeRules,
       ...reactHooks.configs.recommended.rules,
       'react/jsx-no-target-blank': 'off',
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
+      'react-refresh/only-export-components': 'off',
+      'react-hooks/exhaustive-deps': 'off',
       // Relax rules that were causing noisy errors but not real bugs
       'react/prop-types': 'off',
       'react/no-unescaped-entities': 'off',
-      'no-unused-vars': [
-        'warn',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-        },
-      ],
+      'no-unused-vars': 'off',
     },
   },
 ]

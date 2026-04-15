@@ -269,12 +269,13 @@ const DisplayHome = () => {
             />
             <div className="songs-grid">
               {searchResults.playlists.map((playlist) => (
-                <PlaylistItem
-                  key={playlist._id}
-                  id={playlist._id}
-                  name={playlist.name}
-                  songCount={playlist.songs?.length || 0}
-                />
+                <div key={playlist._id} className="overflow-visible">
+                  <PlaylistItem
+                    id={playlist._id}
+                    name={playlist.name}
+                    songCount={playlist.songs?.length || 0}
+                  />
+                </div>
               ))}
             </div>
           </section>
@@ -533,11 +534,13 @@ const DisplayHome = () => {
           seeAllRoute="/playlists"
           scrollKey="playlists"
           renderItem={(playlist) => (
-            <PlaylistItem
-              id={playlist._id}
-              name={playlist.name}
-              songCount={playlist.songs?.length || 0}
-            />
+            <div className="overflow-visible">
+              <PlaylistItem
+                id={playlist._id}
+                name={playlist.name}
+                songCount={playlist.songs?.length || 0}
+              />
+            </div>
           )}
         />
       )}

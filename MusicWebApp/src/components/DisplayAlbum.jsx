@@ -113,7 +113,7 @@ const DisplayAlbum = ({ album }) => {
           <h2 className="text-5xl font-bold mb-4 md:text-7xl text-gray-900 dark:text-gray-100 whitespace-nowrap overflow-hidden text-ellipsis w-full">
             {safeAlbumData?.name || ""}
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">{safeAlbumData.desc}</p>
+          <p className="text-base text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">{safeAlbumData.desc}</p>
           <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
               <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
@@ -153,7 +153,7 @@ const DisplayAlbum = ({ album }) => {
       {albumSongs.length > 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           {/* Table Header */}
-          <div className="grid grid-cols-12 gap-4 p-6 text-gray-500 dark:text-gray-400 text-sm font-medium border-b border-gray-200 dark:border-gray-700">
+          <div className="grid grid-cols-12 gap-4 p-6 text-gray-600 dark:text-gray-300 text-sm font-semibold border-b border-gray-200 dark:border-gray-700">
             <div className="col-span-1 text-center">#</div>
             <div className="col-span-6">Title</div>
             <div className="col-span-3 hidden md:block">Album</div>

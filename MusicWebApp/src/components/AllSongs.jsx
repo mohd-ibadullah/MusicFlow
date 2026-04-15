@@ -117,6 +117,17 @@ const AllSongs = () => {
     return result;
   }, [songsData, searchQuery, languageFilter, artistFilter, popularityFilter, durationFilter, sortBy]);
 
+  const activeFiltersCount = useMemo(() => {
+    return [
+      languageFilter !== "all",
+      artistFilter !== "all",
+      durationFilter !== "all",
+      popularityFilter !== "all",
+      sortBy !== "newest",
+      searchQuery.trim().length > 0,
+    ].filter(Boolean).length;
+  }, [languageFilter, artistFilter, durationFilter, popularityFilter, sortBy, searchQuery]);
+
   const handleBack = () => navigate(-1);
 
   const handlePlayAll = () => {
@@ -126,6 +137,15 @@ const AllSongs = () => {
     } else {
       showToast("No songs to play", "info");
     }
+  };
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setSortBy("newest");
+    setLanguageFilter("all");
+    setArtistFilter("all");
+    setDurationFilter("all");
+    setPopularityFilter("all");
   };
 
   return (
@@ -155,7 +175,20 @@ const AllSongs = () => {
         </button>
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="panel-soft p-4 sm:p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-h3 text-gray-800 dark:text-gray-100">Filter & sort</h3>
+          {activeFiltersCount > 0 && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="btn-ghost text-sm"
+            >
+              Clear filters ({activeFiltersCount})
+            </button>
+          )}
+        </div>
+
         <div className="relative w-full max-w-md">
           <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -165,40 +198,40 @@ const AllSongs = () => {
             placeholder="Search songs, artists, albums..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm"
+            className="input-search-soft"
           />
         </div>
 
-        <div className="flex flex-wrap gap-3 items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 items-center">
           <CustomDropdown 
             options={languageOptions} 
             value={languageFilter} 
             onChange={setLanguageFilter} 
-            className="flex-1"
+            className="w-full"
           />
           <CustomDropdown 
             options={artistOptions} 
             value={artistFilter} 
             onChange={setArtistFilter} 
-            className="flex-1"
+            className="w-full"
           />
           <CustomDropdown 
             options={durationOptions} 
             value={durationFilter} 
             onChange={setDurationFilter} 
-            className="flex-1"
+            className="w-full"
           />
           <CustomDropdown 
             options={popularityOptions} 
             value={popularityFilter} 
             onChange={setPopularityFilter} 
-            className="flex-1"
+            className="w-full"
           />
           <CustomDropdown 
             options={sortOptions} 
             value={sortBy} 
             onChange={setSortBy} 
-            className="flex-1"
+            className="w-full"
           />
         </div>
       </div>

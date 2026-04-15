@@ -36,7 +36,7 @@ songRouter.post("/remove", authenticateToken, authorizeAdmin, removeSong);
 songRouter.post("/like", authenticateToken, likeSong);
 songRouter.post("/unlike", authenticateToken, unlikeSong);
 songRouter.get("/liked", authenticateToken, getLikedSongs);
-songRouter.post("/play/:songId", incrementPlayCount);
+songRouter.post("/play/:songId", optionalAuth, incrementPlayCount);
 songRouter.post("/recently-played", authenticateToken, addToRecentlyPlayed);
 songRouter.get("/recently-played", authenticateToken, getRecentlyPlayed);
 

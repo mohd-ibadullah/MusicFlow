@@ -1,0 +1,286 @@
+/* SYSTEM SCAN: player bar is fixed at the bottom, so intervention card stays above it. */
+/* SYSTEM SCAN: UI should remain non-intrusive and optional without autoplay behavior. */
+/* SYSTEM SCAN: this stylesheet is scoped to LoopInterventionCard component classes only. */
+
+.ld-card {
+  --ld-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.92));
+  --ld-border: rgba(37, 99, 235, 0.18);
+  --ld-shadow: 0 16px 44px rgba(15, 23, 42, 0.2);
+  --ld-label: rgba(37, 99, 235, 0.86);
+  --ld-text: #0f172a;
+  --ld-muted: #475569;
+  --ld-soft: #64748b;
+  --ld-btn: linear-gradient(145deg, #2563eb, #1d4ed8);
+  --ld-btn-text: #f8fafc;
+
+  position: fixed;
+  bottom: 104px;
+  right: 18px;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  background: var(--ld-bg);
+  border: 1px solid var(--ld-border);
+  border-radius: 18px;
+  padding: 16px;
+  z-index: 10000;
+  box-shadow: var(--ld-shadow);
+  backdrop-filter: blur(16px);
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.26s ease, transform 0.26s ease;
+  pointer-events: none;
+}
+
+.dark .ld-card {
+  --ld-bg: linear-gradient(165deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.92));
+  --ld-border: rgba(148, 163, 184, 0.28);
+  --ld-shadow: 0 20px 46px rgba(2, 6, 23, 0.55);
+  --ld-label: rgba(191, 219, 254, 0.92);
+  --ld-text: #f8fafc;
+  --ld-muted: rgba(226, 232, 240, 0.9);
+  --ld-soft: rgba(148, 163, 184, 0.95);
+  --ld-btn: linear-gradient(145deg, #f8fafc, #e2e8f0);
+  --ld-btn-text: #0f172a;
+}
+
+.ld-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  padding: 1px;
+  background: linear-gradient(130deg, rgba(59, 130, 246, 0.25), rgba(14, 165, 233, 0.05));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.ld-card--visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+
+.ld-card--exiting {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+.ld-card__dismiss {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: 0;
+  color: var(--ld-soft);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.ld-card__dismiss:hover {
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--ld-text);
+}
+
+.ld-card__header {
+  padding-right: 24px;
+}
+
+.ld-card__label {
+  display: inline-block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ld-label);
+  font-weight: 700;
+}
+
+.ld-card__count {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--ld-muted);
+  font-weight: 600;
+}
+
+.ld-card__bridge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 13px 0 12px;
+}
+
+.ld-card__cover {
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
+}
+
+.ld-card__cover--placeholder {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.2), rgba(14, 165, 233, 0.2));
+  color: var(--ld-label);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.ld-card__info {
+  min-width: 0;
+}
+
+.ld-card__bridge-label {
+  margin: 0 0 3px;
+  font-size: 11px;
+  color: var(--ld-soft);
+  font-weight: 600;
+}
+
+.ld-card__title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 800;
+  color: var(--ld-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ld-card__artist {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ld-muted);
+}
+
+.ld-card__message {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ld-muted);
+}
+
+.ld-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ld-card__actions--stacked {
+  flex-direction: column;
+}
+
+.ld-card__play {
+  flex: 1;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ld-btn);
+  color: var(--ld-btn-text);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.ld-card__play:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+}
+
+.ld-card__play--soft {
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.15), rgba(14, 165, 233, 0.12));
+  color: var(--ld-text);
+}
+
+.ld-card__skip {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--ld-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.ld-card__skip:hover {
+  background: rgba(148, 163, 184, 0.18);
+  transform: translateY(-1px);
+}
+
+.ld-card__mix {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.22), rgba(14, 165, 233, 0.2));
+  color: var(--ld-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.ld-card__mix:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.ld-card__disclaimer {
+  margin: 12px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ld-muted);
+}
+
+.ld-card__dev-note {
+  margin: 8px 0 0;
+  text-align: right;
+  font-size: 10px;
+  color: var(--ld-soft);
+}
+
+@media (min-width: 641px) {
+  .ld-card {
+    --ld-header-safe: 78px;
+    --ld-footer-safe: 104px;
+
+    top: calc(var(--ld-header-safe) + ((100vh - var(--ld-header-safe) - var(--ld-footer-safe)) / 2));
+    bottom: auto;
+    transform: translateY(calc(-50% + 18px));
+  }
+
+  .ld-card--visible {
+    transform: translateY(-50%);
+  }
+
+  .ld-card--exiting {
+    transform: translateY(calc(-50% + 18px));
+  }
+}
+
+@media (max-width: 640px) {
+  .ld-card {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    bottom: 92px;
+  }
+
+  .ld-card__title {
+    font-size: 18px;
+  }
+}

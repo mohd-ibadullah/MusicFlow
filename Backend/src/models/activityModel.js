@@ -4,7 +4,21 @@ const activitySchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ["song_played", "song_added", "song_liked", "playlist_created", "album_added"],
+      enum: [
+        "song_played",
+        "song_added",
+        "song_deleted",
+        "song_liked",
+        "song_unliked",
+        "playlist_created",
+        "playlist_updated",
+        "playlist_deleted",
+        "album_added",
+        "album_deleted",
+        "loop_triggered",
+        "loop_updated",
+        "ai_playlist_generated",
+      ],
       required: true,
     },
     message: { type: String, required: true },

@@ -99,7 +99,7 @@ const Player = () => {
 
   if (!track) {
     return (
-      <div className="h-20 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-700/50 flex items-center justify-center text-gray-500 dark:text-gray-400 transition-all duration-500">
+      <div className="h-[5.5rem] bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-700/50 flex items-center justify-center text-gray-500 dark:text-gray-400 transition-all duration-500">
         <div className="text-center">
           <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-2">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -119,13 +119,13 @@ const Player = () => {
   };
 
   return (
-    <div className="h-20 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-700/50 px-4 sm:px-6 transition-all duration-500">
-      <div className="max-w-7xl mx-auto h-full flex items-center justify-between">
+    <div className="h-[5.5rem] bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 lg:px-5 transition-all duration-500">
+      <div className="max-w-7xl mx-auto h-full flex items-center gap-2 lg:gap-3">
         
         {/* Track Info */}
-        <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 basis-[35%] xl:basis-[32%] pr-2 lg:pr-4 border-r border-gray-200/60 dark:border-gray-700/60">
           <img 
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover shadow-lg" 
+            className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-cover shadow-lg" 
             src={track.image} 
             alt={track.name} 
           />
@@ -141,8 +141,8 @@ const Player = () => {
             onClick={() => toggleLikeSong(track._id)}
             className={`p-2 rounded-lg transition-all duration-200 ${
               isLiked 
-                ? 'text-red-500 hover:text-red-600' 
-                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                ? 'text-red-500 hover:text-red-600 bg-red-50 dark:bg-red-500/10' 
+                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/70'
             }`}
             title={isLiked ? "Remove from liked songs" : "Add to liked songs"}
           >
@@ -151,8 +151,8 @@ const Player = () => {
         </div>
 
         {/* Player Controls */}
-        <div className="flex flex-col items-center space-y-2 flex-1 max-w-md">
-          <div className="flex items-center space-x-4 sm:space-x-6">
+        <div className="flex flex-col items-center justify-center gap-1.5 flex-1 min-w-0 px-2 sm:px-3">
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
             {/* Shuffle Button */}
             <button 
               onClick={toggleShuffle}
@@ -187,7 +187,7 @@ const Player = () => {
             {/* Play/Pause Button */}
             <button
               onClick={togglePlay}
-              className="btn-primary p-0 min-w-0 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center"
+              className="btn-primary p-0 min-w-0 w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center"
               title={playStatus ? "Pause" : "Play"}
             >
               {playStatus ? (
@@ -199,7 +199,7 @@ const Player = () => {
 
             {/* Next Button */}
             <button 
-              onClick={next}
+              onClick={() => next({ reason: "manual" })}
               disabled={!currentPlaylist || currentPlaylist.length <= 1}
               className={`transition-colors duration-200 ${
                 !currentPlaylist || currentPlaylist.length <= 1
@@ -230,8 +230,8 @@ const Player = () => {
           </div>
 
           {/* Progress Bar */}
-          <div className="flex items-center space-x-2 sm:space-x-3 w-full">
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-8 sm:w-10 text-right hidden sm:block">
+          <div className="flex items-center gap-2 sm:gap-3 w-[88%] max-w-[21rem] mx-auto">
+            <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 w-11 text-right hidden sm:block">
               {formatTime(time.currentTime)}
             </span>
             <div
@@ -246,18 +246,18 @@ const Player = () => {
                 <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg" />
               </div>
             </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-8 sm:w-10 hidden sm:block">
+            <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 w-11 hidden sm:block">
               {formatTime(time.totalTime)}
             </span>
           </div>
         </div>
 
         {/* Volume Control */}
-        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1 justify-end">
+        <div className="flex items-center justify-end gap-2 sm:gap-3 xl:gap-4 min-w-0 basis-[29%] xl:basis-[30%] pl-3 lg:pl-5 border-l border-gray-200/60 dark:border-gray-700/60">
           <div className="relative" ref={volumeRef}>
             <button
               onClick={() => setIsVolumeOpen(!isVolumeOpen)}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-300"
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/70 transition-colors duration-300"
               title="Volume control"
             >
               {volume === 0 ? (
@@ -277,7 +277,7 @@ const Player = () => {
 
             {/* Volume Popup */}
             {isVolumeOpen && (
-              <div className="absolute bottom-12 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-4 border border-gray-200 dark:border-gray-700 animate-fade-in">
+              <div className="absolute bottom-12 right-0 bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-4 border border-gray-200 dark:border-gray-700 animate-fade-in">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-gray-500 dark:text-gray-400">Volume</span>
                   <span className="text-xs text-gray-700 dark:text-gray-300">{volume}%</span>
@@ -320,7 +320,7 @@ const Player = () => {
           </div>
 
           <div
-            className="w-16 sm:w-24 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full cursor-pointer hidden md:block"
+            className="w-16 sm:w-24 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full cursor-pointer hidden md:block xl:mr-7"
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               const percent = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
@@ -333,9 +333,9 @@ const Player = () => {
             />
           </div>
           
-          {/* Live listeners indicator - securely anchored to the volume flex box */}
-          <div className="pl-2 sm:pl-4 border-l border-gray-200/50 dark:border-gray-700/50 hidden lg:flex items-center">
-            <span className="whitespace-nowrap text-sm opacity-70 min-w-[110px] flex justify-end text-right font-semibold text-orange-600 dark:text-orange-400 items-center gap-1.5">
+          {/* Live listeners indicator */}
+          <div className="hidden xl:flex ml-2 items-center rounded-lg bg-orange-50 dark:bg-orange-500/10 border border-orange-200/60 dark:border-orange-500/30 px-2.5 py-1.5">
+            <span className="whitespace-nowrap text-xs flex text-right font-semibold text-orange-600 dark:text-orange-400 items-center gap-1.5">
               <Flame className="w-4 h-4 shrink-0" />
               {activeListenersCount} listening
             </span>

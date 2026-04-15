@@ -9,12 +9,14 @@ const PlaylistItem = memo(({ id, name, songCount = 0, image }) => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { playPlaylist } = usePlayer();
-  const [isHovered, setIsHovered] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   // Data validation and fallbacks
   const safeName = name && typeof name === 'string' ? name : "Untitled Playlist";
   const safeId = id && typeof id === 'string' ? id : null;
   const safeSongCount = typeof songCount === 'number' ? songCount : 0;
+  const safeImage = image && typeof image === 'string' ? image.trim() : "";
+  const hasPlayableImage = !!safeImage && !imgError;
   
   // Default playlist image with gradient
   const defaultImage = `linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)`;
@@ -41,37 +43,35 @@ const PlaylistItem = memo(({ id, name, songCount = 0, image }) => {
   return (
     <div
       onClick={handleClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={`group cursor-pointer transition-all duration-500 ${
+      className={`group/playlist-content relative rounded-xl overflow-hidden cursor-pointer transform-gpu transition-all duration-300 hover:-translate-y-0.5 ${
         !safeId ? 'opacity-60 cursor-not-allowed' : ''
       }`}
     >
-      <div className="relative rounded-xl p-5 bg-white dark:bg-gray-800/90 border border-gray-100 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
-        <div className="relative overflow-hidden rounded-lg mb-4">
-          {/* Playlist Image/Icon */}
-          <div 
-            className="w-full aspect-square rounded-xl flex items-center justify-center text-white text-6xl font-bold relative overflow-hidden"
-            style={{
-              background: image && typeof image === 'string' 
-                ? `url(${image}) center/cover` 
-                : defaultImage
-            }}
-          >
-            {!image && (
-              <div className="absolute inset-0 bg-blue-500 flex items-center justify-center">
+      <div className="relative rounded-xl p-5 bg-white dark:bg-gray-800/90 border border-gray-100 dark:border-gray-700/50 shadow-sm transition-all duration-300 group-hover/playlist-content:shadow-md">
+        <div className="relative overflow-hidden rounded-xl mb-4">
+          <div className="w-full aspect-square rounded-xl relative overflow-hidden bg-blue-500">
+            {hasPlayableImage ? (
+              <img
+                src={safeImage}
+                onError={() => setImgError(true)}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover/playlist-content:scale-[1.02]"
+                alt={safeName}
+              />
+            ) : (
+              <div
+                className="absolute inset-0 flex items-center justify-center"
+                style={{ background: defaultImage }}
+              >
                 <Music2 className="w-16 h-16 text-white" aria-hidden />
               </div>
             )}
             
             {/* Overlay */}
-            <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
+            <div className="absolute inset-0 bg-black opacity-0 group-hover/playlist-content:opacity-20 transition-opacity duration-300" />
             
             {/* Play Button Overlay - Only show if playlist is available and has songs */}
             {safeId && safeSongCount > 0 && (
-              <div className={`absolute bottom-3 right-3 transform transition-all duration-300 ${
-                isHovered ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-2 opacity-0 scale-95'
-              }`}>
+              <div className="absolute bottom-3 right-3 transform transition-all duration-300 translate-y-2 opacity-0 scale-95 group-hover/playlist-content:translate-y-0 group-hover/playlist-content:opacity-100 group-hover/playlist-content:scale-100">
                 <button 
                   onClick={handlePlayClick}
                   className="btn-primary p-2 min-w-0 w-12 h-12 flex items-center justify-center shadow-md"
@@ -96,14 +96,14 @@ const PlaylistItem = memo(({ id, name, songCount = 0, image }) => {
             )}
 
             {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/playlist-content:opacity-100 transition-opacity duration-300" />
           </div>
         </div>
         
         <div className="space-y-2">
           <h3 className={`font-bold text-lg truncate leading-tight transition-colors duration-200 ${
             safeId 
-              ? 'text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400' 
+              ? 'text-gray-900 dark:text-gray-100 group-hover/playlist-content:text-blue-600 dark:group-hover/playlist-content:text-blue-400' 
               : 'text-gray-500 dark:text-gray-400'
           }`}>
             {safeName}
@@ -118,7 +118,7 @@ const PlaylistItem = memo(({ id, name, songCount = 0, image }) => {
 
         {/* Hover Border Effect - Only for available playlists */}
         {safeId && (
-          <div className="absolute inset-0 rounded-xl border-2 border-transparent group-hover:border-blue-500/20 transition-all duration-200 pointer-events-none" />
+          <div className="absolute inset-0 rounded-xl ring-0 group-hover/playlist-content:ring-1 group-hover/playlist-content:ring-blue-500/25 transition-all duration-300 pointer-events-none" />
         )}
       </div>
     </div>
