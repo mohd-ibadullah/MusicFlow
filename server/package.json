@@ -11,6 +11,7 @@
     "start": "node server.js",
     "server": "nodemon --ignore src/ai/runtime/** server.js",
     "seed": "node seed.js",
+    "gen:embeddings": "node scripts/generate-embeddings.mjs",
     "audit:high": "npm audit --audit-level=high",
     "ci": "npm test && npm run audit:high"
   },

@@ -768,7 +768,7 @@ const findSongsFromIntent = async ({ intent, prompt }) => {
   const fallbackTerms = getHeuristicTermsFromPrompt(prompt);
   if (fallbackTerms.length > 0) {
     const fallbackRegex = new RegExp(fallbackTerms.map((term) => escapeRegex(term)).join("|"), "i");
-    return Song.find({
+    const fallbackMatches = await Song.find({
       $or: [
         { genre: fallbackRegex },
         { desc: fallbackRegex },
@@ -779,9 +779,16 @@ const findSongsFromIntent = async ({ intent, prompt }) => {
       .sort({ playCount: -1, likeCount: -1, _id: 1 })
       .limit(20)
       .lean();
+
+    if (fallbackMatches.length > 0) {
+      return fallbackMatches;
+    }
   }
 
-  return [];
+  return Song.find({})
+    .sort({ playCount: -1, likeCount: -1, _id: 1 })
+    .limit(20)
+    .lean();
 };
 
 // Cleanup old playlists without user field (admin only)
@@ -825,7 +832,7 @@ export const generatePlaylist = async (req, res) => {
     if (matchingSongs.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "No songs found matching the inferred intent. Try a different prompt."
+        message: "No songs available to build a playlist yet."
       });
     }
 
