@@ -209,7 +209,7 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
 
 ## Author
 
-Maintained by **[@your-github-handle](https://github.com/your-github-handle)** — swap the link for yours before you send this to recruiters.
+Maintained by **MOHD IBADULLAH** · [GitHub](https://github.com/123ibadullah) · LinkedIn: *(add when available)*
 
 ---
 

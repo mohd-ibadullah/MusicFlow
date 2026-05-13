@@ -42,3 +42,11 @@ client-dist/
 *.tmp
 *.temp
 
+# ML model artifacts
+*.npy
+*.pth
+*.pt
+
+# AI runtime state (auto-generated, contains user data)
+src/ai/runtime/
+
