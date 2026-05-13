@@ -1,6 +1,6 @@
 # MusicFlow — Complete Technical Deep Dive
 
-This document covers **100% of the project** — every feature, every file, every architectural decision, every edge case, and every interview question you could face. If you master this document, you can explain any part of MusicFlow to any interviewer.
+This document covers the full architecture, design decisions, and implementation details of MusicFlow — routes, models, edge cases, and engineering tradeoffs.
 
 ---
 

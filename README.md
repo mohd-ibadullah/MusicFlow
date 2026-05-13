@@ -47,7 +47,7 @@ REST under `/api/*`, Socket.io for listener counts and realtime fan-out, optiona
 ## Repository layout
 
 ```text
-MF/
+MusicFlow/
 ├── client/                 # Listener React app (Vite dev server, default port 5000)
 ├── server/                 # Express + Socket.io (`server.js`, `src/`, `tests/`)
 ├── admin/                  # Admin React app (Vite, default port 5173)
@@ -209,7 +209,7 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
 
 ## Author
 
-Maintained by **MOHD IBADULLAH** · [GitHub](https://github.com/123ibadullah) · LinkedIn: *(add when available)*
+Maintained by **MOHD IBADULLAH** · [GitHub](https://github.com/123ibadullah) · [LinkedIn](https://www.linkedin.com/in/mohd-ibadullah-12a046280)
 
 ---
 
