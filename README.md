@@ -93,11 +93,11 @@ Deep dive (routes, models, edge cases, interview notes): [docs/FINAL_PROJECT_GUI
 
 ## Screenshots
 
-Add a few PNGs or GIFs under `screenshots/` (home, player, admin analytics, loop card). GitHub renders them if you link them here, for example:
-
-```markdown
-![Home](screenshots/home.png)
-```
+![Client home](screenshots/client-home.png)
+![AI playlist generation](screenshots/client-playlist-ai.gif)
+![Admin overview](screenshots/admin-overview.gif)
+![Admin analytics](screenshots/admin-analytics.png)
+![Loop diagnosis](screenshots/admin-loop-diagnosis.png)
 
 ---
 
