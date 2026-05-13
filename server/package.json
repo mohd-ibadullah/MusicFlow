@@ -1,0 +1,44 @@
+{
+  "name": "musicflow-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "build:client": "node -e \"const fs=require('fs');const path=require('path');const src=path.resolve('..','client','dist');const dst=path.resolve('client-dist');if(fs.existsSync(src)){fs.rmSync(dst,{recursive:true,force:true});fs.mkdirSync(dst,{recursive:true});fs.cpSync(src,dst,{recursive:true});console.log('✅ Copied frontend dist to',dst);}else{console.warn('⚠️ Frontend dist not found at',src);}\"",
+    "test": "node scripts/run-node-tests.mjs",
+    "test:ld": "node scripts/run-node-tests.mjs loopDiagnosis",
+    "start": "node server.js",
+    "server": "nodemon --ignore src/ai/runtime/** server.js",
+    "seed": "node seed.js",
+    "audit:high": "npm audit --audit-level=high",
+    "ci": "npm test && npm run audit:high"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "src/ai/runtime/**"
+    ]
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.88.0",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.1",
+    "multer": "^2.0.2",
+    "nodemon": "^3.1.10",
+    "openai": "^6.34.0",
+    "redis": "^4.7.0",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^11.0.1"
+  }
+}

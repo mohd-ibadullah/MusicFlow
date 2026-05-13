@@ -1,4 +1,4 @@
-// SYSTEM SCAN: backend runtime is ESM under Backend/, while this root script runs as CommonJS.
+// SYSTEM SCAN: backend runtime is ESM under server/, while this root script runs as CommonJS.
 // SYSTEM SCAN: loop diagnosis entry point is src/services/loopDiagnosis/loopDiagnosisEngine.js handlePlayEvent.
 // SYSTEM SCAN: Redis may be unavailable in this project; simulation includes an in-memory fallback.
 
@@ -7,7 +7,7 @@ const { pathToFileURL } = require("url");
 const { createRequire } = require("module");
 
 const rootDir = path.resolve(__dirname, "..");
-const backendDir = path.resolve(rootDir, "Backend");
+const backendDir = path.resolve(rootDir, "server");
 const backendRequire = createRequire(path.join(backendDir, "package.json"));
 
 const dotenv = backendRequire("dotenv");

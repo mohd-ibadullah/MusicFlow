@@ -1,232 +1,218 @@
 # MusicFlow
 
-> A production-grade, full-stack music streaming platform built with the MERN stack featuring real-time analytics, LLM-intent AI playlist generation, Loop Diagnosis wellbeing interventions, Redis caching, and Socket.io live activity.
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
+[![Node.js 20+](https://img.shields.io/badge/node.js-%3E%3D20-darkgreen)](https://nodejs.org/)
+[![Express 5](https://img.shields.io/badge/Express-5-lightgrey)](https://expressjs.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248)](https://www.mongodb.com/)
+
+Full-stack music web app: React listener client, separate React admin panel, and an Express API with Socket.io, optional Redis, and MongoDB. I built it to learn how streaming-style products wire up auth, real-time counters, caching, and a little ML-adjacent ranking—not to ship a consumer product.
 
 ---
 
-## Architecture Overview
+## The problem I cared about
 
-```
-┌─────────────────────┐   ┌─────────────────────┐
-│   User App (React)  │   │  Admin Panel (React) │
-│   Port: 5000        │   │  Port: 5173          │
-└────────┬────────────┘   └────────┬─────────────┘
-         │  Vite Proxy (/api)      │  Vite Proxy (/api)
-         └──────────┬──────────────┘
-                    │
-          ┌─────────▼──────────┐
-          │  Express Backend   │
-          │  Port: 4002        │
-          │  REST + Socket.io  │
-          └──┬───────────┬─────┘
-             │           │
-    ┌────────▼───┐  ┌────▼──────┐   ┌───────────────┐
-    │  MongoDB   │  │   Redis   │   │  Cloudinary   │
-    │  (Atlas)   │  │  (Cache)  │   │  (Media CDN)  │
-    └────────────┘  └───────────┘   └───────────────┘
-```
+Playlist apps are easy to mock in a UI. They are harder to get right when play counts matter, many tabs are open, admins need honest analytics, and you still want recommendations that do not hallucinate tracks that do not exist in your database. This repo is my answer: one API that serves two frontends, keeps counts consistent, and separates “LLM help” from “data the app actually owns.”
 
 ---
 
-## Tech Stack
+## What it does (for real)
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | React 19, Vite, Tailwind CSS | User-facing SPA with responsive design |
-| **Admin** | React 19, Vite, Tailwind CSS | Separate SPA for content management |
-| **Backend** | Node.js, Express 5 | REST API server |
-| **Database** | MongoDB + Mongoose | Primary data store with atomic operators |
-| **Cache** | Redis | Performance layer with graceful degradation |
-| **Real-time** | Socket.io | Live listener counts and activity feed |
-| **Media** | Cloudinary | Audio/image CDN with auto-optimization |
-| **Auth** | JWT + bcrypt (salt 12) | Token-based auth with role-based access |
-| **Security** | Helmet, CORS, Rate Limiting | HTTP hardening + DDoS protection |
+**Listener (`client/`)**  
+Sign up, log in, browse albums, play audio with a global player, like songs, build playlists, run an AI playlist generator (prompt in → query and rank from Mongo only), see recommendations, search the library, and—if enabled—get loop-detection nudges when the same song repeats a lot.
+
+**Admin (`admin/`)**  
+JWT-protected dashboard: add/delete songs and albums (Cloudinary uploads), charts (aggregations), live-ish activity feed, loop-diagnosis stats.
+
+**API (`server/`)**  
+REST under `/api/*`, Socket.io for listener counts and realtime fan-out, optional Redis for caching and loop-session state with in-memory fallback, Cloudinary for media, bcrypt + JWT for users and admin role checks.
 
 ---
 
-## Features at a Glance
+## Tech stack
 
-### User App
-- 🎵 Audio streaming with full playback controls (play/pause, seek, next/prev, shuffle, repeat)
-- ❤️ Like/unlike songs with optimistic UI and atomic rollback
-- 📀 Browse albums and song collections
-- 🔥 Trending songs (ranked by play count)
-- 🤖 LLM-assisted AI playlist generation from text prompts (intent extraction + DB-only song retrieval)
-- 📋 Custom playlist CRUD (create, add/remove songs, delete)
-- 🕐 Recently played history (capped at 5, atomic deduplication)
-- 🎯 Personalized recommendations (language + artist affinity)
-- 🧠 Loop Diagnosis interventions (bridge track, break, snooze, switch mix)
-- 🔍 Client-side search with real-time filtering
-- 👥 Live listener count via Socket.io
-- 🔐 JWT authentication with cross-tab sync
-- 📱 Fully responsive (desktop + mobile sidebar)
-
-### Admin Panel
-- 📊 Real-time analytics dashboard (songs, albums, streams, active users)
-- 🏆 Top 10 songs and top 10 artists (MongoDB aggregation)
-- 📝 Live activity feed (plays, likes, playlist creates, song adds)
-- ➕ Add songs with dual Cloudinary upload (image + audio)
-- ➕ Add albums with image upload
-- 🗑️ Delete songs/albums with cache invalidation
-- 🔒 Admin-only route protection (role-based middleware)
+| Area | Choice | Why it is there |
+|------|--------|-----------------|
+| Listener UI | React 19, Vite, Tailwind | Fast dev, small bundle story with manual chunks in Vite |
+| Admin UI | React 19, Vite, Tailwind | Same toolchain, isolated bundle and auth context |
+| API | Node 20+, Express 5, ESM | One process for HTTP + Socket.io |
+| Data | MongoDB + Mongoose | Flexible documents for songs, users, playlists, loop events |
+| Cache | Redis (optional) | Song/listener caching; code paths tolerate Redis being off |
+| Realtime | Socket.io | Listener counts, admin activity, loop-diagnosis namespace |
+| Media | Cloudinary | Hosted audio + art |
+| Auth | JWT + bcrypt | Stateless API auth; admin routes gated by role |
+| Ranking / AI | Embeddings `.npy`, heuristics, LLM intent parsing | Recommendations + playlist intent without inventing songs |
 
 ---
 
-## Getting Started
+## Repository layout
 
-### Prerequisites
-- Node.js 18+
-- MongoDB (local or Atlas)
-- Redis (optional — app degrades gracefully without it)
-
-### Setup
-```bash
-cp .env.example .env
-# Fill in: MONGODB_URI, JWT_SECRET, CLOUDINARY_NAME, CLOUDINARY_API_KEY, CLOUDINARY_SECRET_KEY
-```
-
-### Run
-```bash
-# Backend
-cd Backend && npm install && node server.js
-
-# Frontend (separate terminal)
-cd MusicWebApp && npm install && npm run dev
-
-# Admin Panel (separate terminal)
-cd admin && npm install && npm run dev
-```
-
----
-
-## Project Structure
-
-```
+```text
 MF/
-├── Backend/
-│   ├── server.js                 # Express + Socket.io + HTTP server
-│   ├── src/
-│   │   ├── config/               # MongoDB, Redis, Cloudinary connections
-│   │   ├── controllers/          # Business logic (auth/song/album/playlist/ai/analytics)
-│   │   ├── middleware/           # JWT auth, admin authorization, multer
-│   │   ├── models/               # Core + AI + Loop Diagnosis schemas
-│   │   ├── routes/               # Auth/song/album/playlist/admin/ai/loop diagnosis routers
-│   │   ├── services/             # Cache, recommendations, loop diagnosis engine
-│   │   └── utils/                # Activity logger
-│   └── package.json
-├── MusicWebApp/
-│   ├── src/
-│   │   ├── components/           # 29 React components
-│   │   ├── context/              # PlayerContext, AuthContext, ThemeContext
-│   │   ├── pages/                # Login, Signup, TrendingSongs, BiggestHits
-│   │   └── index.css             # Design system (Tailwind + custom)
-│   └── package.json
-├── admin/
-│   ├── src/
-│   │   ├── components/           # Navbar, Sidebar, DeleteModal, AdminProtectedRoute
-│   │   ├── context/              # AuthContext (admin-specific)
-│   │   └── pages/                # AdminLogin, AdminAnalytics, AddSong, AddAlbum, ListSong, ListAlbum
-│   └── package.json
-├── FINAL_PROJECT_GUIDE.md        # Deep technical walkthrough (interview prep)
-└── .env.example
+├── client/                 # Listener React app (Vite dev server, default port 5000)
+├── server/                 # Express + Socket.io (`server.js`, `src/`, `tests/`)
+├── admin/                  # Admin React app (Vite, default port 5173)
+├── docs/                   # Long-form technical write-up
+│   └── FINAL_PROJECT_GUIDE.md
+├── data/                   # Optional interaction export for embedding pipeline (`data/data.json`)
+├── tests/                  # Placeholder for future cross-package tests (API tests live in `server/tests/`)
+├── screenshots/            # Drop UI captures here for your portfolio README previews
+├── scripts/                # Repo-level helpers (loop sim, hooks, etc.)
+├── .github/workflows/      # CI: tests + lint + build + audits
+├── .env.example            # Copy to repo root `.env` for local API
+└── README.md               # You are here
 ```
 
 ---
 
-## For Reviewers
+## Architecture (short)
 
-If you're evaluating this codebase, these are the files worth reading:
+```text
+   ┌─────────────┐     ┌─────────────┐
+   │   client    │     │    admin    │
+   │ (Vite :5000)│     │ (Vite :5173)│
+   └──────┬──────┘     └──────┬──────┘
+          │  proxy /api       │  proxy /api
+          └─────────┬─────────┘
+                    ▼
+            ┌───────────────┐
+            │    server     │  HTTP + Socket.io (:4002)
+            └───────┬───────┘
+                    │
+        ┌───────────┼───────────┐
+        ▼           ▼           ▼
+    MongoDB      Redis      Cloudinary
+   (required)   (optional)   (media CDN)
+```
 
-1. **`PlayerContext.jsx`** — Global player state management. Playback time is deliberately excluded from context to prevent re-render cascades.
-2. **`songController.js`** — 800+ lines covering play count deduplication, atomic like/unlike, recently played history, recommendations, and Cloudinary uploads.
-3. **`cacheService.js`** — Redis caching layer with structural invalidation and graceful degradation.
-4. **`server.js`** — Socket.io connection lifecycle with multi-tab user tracking using `userId → Set<socketId>` mapping.
-5. **`playlistController.js`** — Full playlist CRUD + LLM-driven intent extraction (OpenRouter/OpenAI/Anthropic/Google) with DB-only retrieval and ranked playlist creation.
-6. **`authController.js`** — Complete auth system with bcrypt hashing, JWT tokens, profile management, and soft-delete.
+- **Vite** in both frontends proxies `/api` and `/socket.io` to the API in development so you rarely need CORS gymnastics locally.
+- **Production** can serve the built listener SPA from `server/client-dist/` after `npm run build:client`, or set `FRONTEND_DIST` to any folder that contains `index.html`.
 
-For a complete walkthrough of every feature, architectural decision, and interview-ready Q&A, see **[FINAL_PROJECT_GUIDE.md](./FINAL_PROJECT_GUIDE.md)**.
+Deep dive (routes, models, edge cases, interview notes): [docs/FINAL_PROJECT_GUIDE.md](docs/FINAL_PROJECT_GUIDE.md).
 
 ---
 
-## Latest Updates (April 2026)
+## Screenshots
 
-### Loop Diagnosis and Wellbeing Interventions (Updated)
-- Added a full loop-diagnosis feature set across backend, user app, and admin app.
-- New backend model: `Backend/src/models/LoopEvent.js` (with retention index).
-- New backend routes: `Backend/src/routes/loopDiagnosis.js` mounted at `/api/loop-diagnosis`.
-- New backend engine modules under `Backend/src/services/loopDiagnosis/`:
-    - loop detection logic
-    - adaptive behavior policy
-    - bridge candidate selection (LLM + safe fallback)
-    - Redis loop/session/cooldown tracker with in-memory fallback safety
-- New Socket.io namespace: `/loopDiagnosis` initialized via `Backend/src/socket/loopDiagnosisSocket.js`.
-- Reliability updates:
-    - prevents duplicate popups when a pending intervention already exists
-    - resets session baseline after intervention actions (dismiss/bridge/break/snooze/switch)
-    - supports cooldown clear for break/retest flows
-    - marks stale pending interventions as ignored
-- User app integration:
-    - `MusicWebApp/src/hooks/useLoopDiagnosis.js`
-    - `MusicWebApp/src/components/LoopDiagnosis/LoopInterventionCard.jsx`
-- Admin integration:
-    - New page `admin/src/pages/LoopDiagnosisStats.jsx`
-    - New route: `/loop-diagnosis`
+Add a few PNGs or GIFs under `screenshots/` (home, player, admin analytics, loop card). GitHub renders them if you link them here, for example:
 
-### LLM-based AI Playlist Generation (Updated)
-- `POST /api/playlist/generate` now uses LLM for **intent extraction only**; songs are always retrieved from MongoDB.
-- Supports provider normalization for `openrouter`, `openai`, `anthropic`, and `google`.
-- OpenRouter integration uses OpenAI-compatible API calls with `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` headers.
-- Intent payload is sanitized to ignore song-level suggestions and keep only mood/energy/vibe/genre/keyword/artist signals.
-- Matching and ranking use database metadata (`genre`, `artist`, `desc`, `album`) and popularity (`playCount`, `likeCount`).
+```markdown
+![Home](screenshots/home.png)
+```
 
-### ML-based Recommendation System (Updated)
-- Added an embedding-based recommendation pipeline in `Backend/src/ai/embeddingRecommender.js`, exposed via `GET /api/ai/recommendations/:userId`.
-- Ranking combines long-term taste (user-item embedding similarity) with short-term behavior feedback (`play`, `like`, `skip`, `click`) submitted via `POST /api/ai/feedback`.
-- Cold-start handling is multi-stage: feedback-bootstrap recommendations for new users, then deterministic fallback recommendations/trending when signal is insufficient.
-- Recommendation feedback invalidates per-user recommendation cache so the next fetch reflects latest interactions immediately.
-- Responses include explainable metadata (`source`, `fallbackReason`, `metadata`) for debugging and interview discussion.
+---
 
-### Environment and Feature Flags
-- Root `.env` includes Loop Diagnosis settings (thresholds, cooldowns, late-night window, LLM provider/model/timeouts).
-- LLM provider config supports OpenRouter routing in addition to OpenAI/Anthropic/Google provider options.
-- User app `.env` now supports `VITE_LOOP_DIAGNOSIS_ENABLED`.
-- Backend API/proxy defaults remain aligned to backend `PORT=4002`.
+## Setup
 
-### Testing, Security, and CI/CD Improvements
-- Added backend tests:
-    - `Backend/tests/playlistController.validation.test.js`
-    - `Backend/tests/playlistIntent.test.js`
-    - `Backend/tests/songService.test.js`
-    - Loop diagnosis suite under `Backend/tests/loopDiagnosis/`
-- Added workflow: `.github/workflows/quality-gates.yml`.
-    - Backend tests + high-severity audit
-    - MusicWebApp lint/build + high-severity audit
-    - Admin lint/build + high-severity audit
-    - Backend client-dist verification
-- Added consistent scripts:
-    - Backend: `audit:high`, `ci`, `test:ld`
-    - MusicWebApp/Admin: `audit:high`, `ci`
+**Prerequisites:** Node.js 20+, MongoDB URI, Cloudinary account, optional Redis.
 
-### Current Validation Snapshot
-- Backend tests passing locally (including new tests).
-- Frontend and admin lint/build passing.
-- High-severity audits clean for backend, MusicWebApp, and admin.
+1. **Environment**
 
-### Useful Commands
+   ```bash
+   cp .env.example .env
+   ```
+
+   Fill at least `MONGODB_URI`, `JWT_SECRET`, and the `CLOUDINARY_*` fields. Redis is optional; set `REDIS_ENABLED=false` if you skip it.
+
+2. **Client env (optional)**
+
+   ```bash
+   cp client/.env.example client/.env
+   ```
+
+   Leave `VITE_API_URL` empty when using the Vite proxy.
+
+3. **Install and run (three terminals)**
+
+   ```bash
+   cd server && npm install && npm run server
+   ```
+
+   ```bash
+   cd client && npm install && npm run dev
+   ```
+
+   ```bash
+   cd admin && npm install && npm run dev
+   ```
+
+   API default: `http://localhost:4002`. Client dev: `http://localhost:5000`. Admin dev: `http://localhost:5173`.
+
+---
+
+## How pieces talk
+
+### HTTP API
+
+JSON REST under `/api/auth`, `/api/song`, `/api/album`, `/api/playlist`, `/api/admin`, `/api/ai`, `/api/loop-diagnosis`, etc. Controllers own validation and side effects (play dedupe, like counters, playlist CRUD).
+
+### Authentication
+
+- Register/login return a JWT. The **client** stores it in `localStorage`, sets `Authorization` on axios, and listens for `storage` events so multiple tabs stay in sync.
+- **Admin** uses the same token shape but separate layout and route guards; `role: admin` is required for destructive catalog routes.
+- **Socket.io** reads the token from `handshake.auth`, query, or `Authorization` header, verifies it with `JWT_SECRET`, and joins per-user or `admin` rooms for targeted emits.
+
+### Redis
+
+When enabled, Redis backs cache helpers and loop-diagnosis counters/session keys. If Redis is down, the code falls back to in-memory structures where it can so local development still works.
+
+### Socket.io
+
+Used for live listener counts, pushing recent listening events, admin activity, and the `/loopDiagnosis` namespace for wellbeing-style interventions. The server deduplicates socket ↔ user mappings and can mirror “who is listening” in Redis when available.
+
+### LLM usage (playlists)
+
+`POST /api/playlist/generate` calls an LLM to **interpret the user’s text** into a structured intent object (mood, energy, genre hints, etc.). Song IDs always come from MongoDB queries built from that intent—never from free-form model prose—so the catalog stays honest.
+
+### Recommendations
+
+Hybrid scoring: embedding similarity plus recent feedback signals (`play`, `like`, `skip`, …). Cold users get heuristic mixes until there is enough signal. Optional `data/data.json` export feeds mapping logic when you run the embedding pipeline scripts.
+
+---
+
+## Tests and CI
+
 ```bash
-# Backend
-cd Backend && npm test
-cd Backend && npm run test:ld
-cd Backend && npm run ci
-
-# User app
-cd MusicWebApp && npm run ci
-
-# Admin app
+cd server && npm test
+cd server && npm run test:ld
+cd client && npm run ci
 cd admin && npm run ci
 ```
+
+GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-severity audit, client and admin lint/build/audit, then `npm run build:client` to prove the SPA copy step works.
+
+---
+
+## Challenges (honest)
+
+- **Play count spam:** solved with a short server-side dedupe window and guarding concurrent play handlers so double-clicks do not inflate counts.
+- **Context re-renders in the player:** keeping heavy playback state out of React context fields that change every frame took a few iterations; the write-up in `docs/FINAL_PROJECT_GUIDE.md` calls out the approach.
+- **Redis present but not guaranteed:** every feature that likes Redis has a boring fallback so `npm run server` still works on a laptop without Docker.
+- **Windows + Node’s test runner:** passing a directory to `node --test` was flaky here, so the server uses `scripts/run-node-tests.mjs` to expand test files explicitly—same behavior on Linux CI.
+
+---
+
+## What I learned
+
+- Treat LLMs as **planners**, not databases: keep retrieval in code you control.
+- Socket auth deserves the same seriousness as REST auth if you emit user-specific data.
+- **Monorepo-ish** layout pays off when one `build:client` step has to land static files beside the API for a single deploy target.
+
+---
+
+## Future work
+
+- Proper E2E (Playwright) for auth + play + admin upload.
+- Stricter httpOnly cookie session option instead of `localStorage` tokens.
+- Typed OpenAPI spec generated from routes for frontend clients.
+
+---
+
+## Author
+
+Maintained by **[@your-github-handle](https://github.com/your-github-handle)** — swap the link for yours before you send this to recruiters.
 
 ---
 
 ## License
+
 ISC
