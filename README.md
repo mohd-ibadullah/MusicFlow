@@ -93,10 +93,28 @@ Deep dive (routes, models, edge cases, interview notes): [docs/FINAL_PROJECT_GUI
 
 ## Screenshots
 
+### Client
+
+**Home screen**
+
 ![Client home](screenshots/client-home.png)
+
+**AI playlist generation (GIF)**
+
 ![AI playlist generation](screenshots/client-playlist-ai.gif)
+
+### Admin
+
+**Overview (GIF)**
+
 ![Admin overview](screenshots/admin-overview.gif)
+
+**Analytics dashboard**
+
 ![Admin analytics](screenshots/admin-analytics.png)
+
+**Loop diagnosis panel**
+
 ![Loop diagnosis](screenshots/admin-loop-diagnosis.png)
 
 ---
