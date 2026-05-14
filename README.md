@@ -37,7 +37,7 @@ REST under `/api/*`, Socket.io for listener counts and realtime fan-out, optiona
 | API | Node 20+, Express 5, ESM | One process for HTTP + Socket.io |
 | Data | MongoDB + Mongoose | Flexible documents for songs, users, playlists, loop events |
 | Cache | Redis (optional) | Song/listener caching; code paths tolerate Redis being off |
-| Realtime | Socket.io | Listener counts, admin activity, loop-diagnosis namespace |
+| Realtime | Socket.io | Listener counts + admin events on default namespace; /loopDiagnosis for interventions |
 | Media | Cloudinary | Hosted audio + art |
 | Auth | JWT + bcrypt | Stateless API auth; admin routes gated by role |
 | Ranking / AI | Embeddings `.npy`, heuristics, LLM intent parsing | Recommendations + playlist intent without inventing songs |
@@ -50,7 +50,7 @@ REST under `/api/*`, Socket.io for listener counts and realtime fan-out, optiona
 |--------|--------|
 | Frontends | 2 separate React apps (listener + admin) |
 | API endpoints | 30+ REST routes across auth, songs, albums, playlists, AI, loop-diagnosis |
-| Real-time | Socket.io with 3 namespaces — listener counts, admin activity, loop-diagnosis |
+| Real-time | Socket.io default namespace + /loopDiagnosis; admin updates via rooms |
 | Auth system | JWT + bcrypt, role-based (user vs admin), multi-tab sync |
 | AI feature | LLM intent parser → MongoDB query → ranked results (no hallucinated songs) |
 | Wellbeing system | Loop-detection that nudges users when same song repeats excessively |
@@ -100,6 +100,10 @@ MusicFlow/
 
 - **Vite** in both frontends proxies `/api` and `/socket.io` to the API in development so you rarely need CORS gymnastics locally.
 - **Production** can serve the built listener SPA from `server/client-dist/` after `npm run build:client`, or set `FRONTEND_DIST` to any folder that contains `index.html`.
+
+### Full System Architecture
+
+![Full system architecture](docs/architecture.png)
 
 Deep dive (routes, models, edge cases, interview notes): [docs/FINAL_PROJECT_GUIDE.md](docs/FINAL_PROJECT_GUIDE.md).
 
@@ -191,9 +195,9 @@ When enabled, Redis backs cache helpers and loop-diagnosis counters/session keys
 
 Used for live listener counts, pushing recent listening events, admin activity, and the `/loopDiagnosis` namespace for wellbeing-style interventions. The server deduplicates socket ↔ user mappings and can mirror “who is listening” in Redis when available.
 
-### LLM usage (playlists)
+**LLM usage (playlists)** — `POST /api/playlist/generate` uses OpenRouter to interpret prompt intent and always pulls song IDs from MongoDB (never LLM output).
 
-`POST /api/playlist/generate` calls an LLM to **interpret the user’s text** into a structured intent object (mood, energy, genre hints, etc.). Song IDs always come from MongoDB queries built from that intent—never from free-form model prose—so the catalog stays honest.
+When `LLM_PROVIDER=openrouter`, the backend hits the OpenRouter Chat Completions API at `https://openrouter.ai/api/v1`.
 
 ### Recommendations
 

@@ -584,6 +584,8 @@ const callOpenRouterIntent = async ({ prompt, apiKey, model, timeoutMs }) => {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    // LLM provider: OpenRouter (openrouter.ai)
+    // Routes to underlying model — swap model string to change providers without changing this code
     const response = await client.chat.completions.create(
       {
         model,

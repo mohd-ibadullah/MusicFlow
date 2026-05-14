@@ -473,7 +473,7 @@ Backend: `authorizeAdmin` middleware rejects any request where `req.user.role !=
 7. **Traceable response metadata**: API returns `intentSource`, `llmProvider`, `llmModel`, and sanitized `intent`.
 
 OpenRouter path details:
-- Uses OpenAI-compatible client with base URL `https://openrouter.ai/api/v1`.
+- Uses the OpenRouter API with base URL `https://openrouter.ai/api/v1`.
 - Sends `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` headers for proper provider attribution.
 - Falls back safely to heuristic intent when API key/quota/provider call fails.
 
@@ -938,7 +938,7 @@ Playlist generation has been upgraded from keyword-only matching to a hybrid LLM
 Implemented behavior:
 - Endpoint `POST /api/playlist/generate` extracts structured intent from user prompts.
 - Provider normalization supports: OpenRouter, OpenAI, Anthropic, and Google Gemini.
-- OpenRouter path uses OpenAI-compatible calls to `https://openrouter.ai/api/v1`.
+- OpenRouter path uses the OpenRouter API at `https://openrouter.ai/api/v1`.
 - LLM output is sanitized to intent-only fields (`mood`, `energy`, `vibe`, `genres`, `keywords`, `artists`).
 - Songs are always selected from MongoDB; no external recommendation payload is used.
 - Response includes observability metadata (`intentSource`, `llmProvider`, `llmModel`, `intent`).
