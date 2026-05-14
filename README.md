@@ -5,7 +5,7 @@
 [![Express 5](https://img.shields.io/badge/Express-5-lightgrey)](https://expressjs.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248)](https://www.mongodb.com/)
 
-Full-stack music web app: React listener client, separate React admin panel, and an Express API with Socket.io, optional Redis, and MongoDB. I built it to learn how streaming-style products wire up auth, real-time counters, caching, and a little ML-adjacent ranking—not to ship a consumer product.
+Full-stack music web app: React listener client, separate React admin panel, and an Express API with Socket.io, optional Redis, and MongoDB. A production-grade music streaming app built from scratch — real-time listener counts via Socket.io, AI playlist generation, a loop-detection wellbeing system, and a full admin panel with live analytics. Built to understand how streaming products actually work under the hood.
 
 ---
 
@@ -41,6 +41,20 @@ REST under `/api/*`, Socket.io for listener counts and realtime fan-out, optiona
 | Media | Cloudinary | Hosted audio + art |
 | Auth | JWT + bcrypt | Stateless API auth; admin routes gated by role |
 | Ranking / AI | Embeddings `.npy`, heuristics, LLM intent parsing | Recommendations + playlist intent without inventing songs |
+
+---
+
+## What I Built — By The Numbers
+
+| Metric | Detail |
+|--------|--------|
+| Frontends | 2 separate React apps (listener + admin) |
+| API endpoints | 30+ REST routes across auth, songs, albums, playlists, AI, loop-diagnosis |
+| Real-time | Socket.io with 3 namespaces — listener counts, admin activity, loop-diagnosis |
+| Auth system | JWT + bcrypt, role-based (user vs admin), multi-tab sync |
+| AI feature | LLM intent parser → MongoDB query → ranked results (no hallucinated songs) |
+| Wellbeing system | Loop-detection that nudges users when same song repeats excessively |
+| Test coverage | Server unit tests + loop-diagnosis suite + client/admin CI builds |
 
 ---
 
