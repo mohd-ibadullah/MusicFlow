@@ -52,7 +52,7 @@ MusicFlow is a music streaming platform with three parts:
 │  ┌─────────────────┐         ┌─────────────────────┐    │
 │  │   User App      │         │   Admin Panel        │    │
 │  │   React + Vite  │         │   React + Vite       │    │
-│  │   Port :5173    │         │   Port :5174         │    │
+│  │   Port :5000    │         │   Port :5173         │    │
 │  │                 │         │                      │    │
 │  │  PlayerContext   │         │  AuthContext          │    │
 │  │  AuthContext     │         │  AdminAnalytics       │    │
@@ -800,7 +800,7 @@ A: Security and deployment independence. The admin bundle contains analytics cod
 A: We have exactly two global states: player/audio and auth. Context API with `useMemo` on the value object handles this well. Adding Redux would introduce boilerplate (`actions`, `reducers`, `dispatch`) without solving an actual problem. If the app grew to 20+ slices, migration to Zustand would be straightforward since the hook-based API is similar.
 
 **Q: How does your application handle state that updates very frequently?**
-A: The audio element fires `timeupdate` roughly once per second. If that value lived in React context, every component consuming the context would re-render every second — including the song list, sidebar, and search. I isolated time-related state into `Player.jsx` as local state. The context only holds track metadata and play status — things that change infrequently. This reduced re-renders from 300+/second to near zero for non-player components.
+A: The audio element fires `timeupdate` roughly once per second. If that value lived in React context, every component consuming the context would re-render every second — including the song list, sidebar, and search. I isolated time-related state into `Player.jsx` as local state. The context only holds track metadata and play status — things that change infrequently. This reduced re-renders from 300+/second to dramatically lower levels for non-player components.
 
 **Q: What's your API design philosophy?**
 A: RESTful with consistent response format: `{ success: boolean, message/data }`. Auth routes return `data.user` + `data.token`. Error routes include `error` only in development mode. API rate limiting is environment-configurable and enforced in production; local development defaults are relaxed for manual/E2E validation. Admin routes require both `authenticateToken` and `authorizeAdmin` middleware.

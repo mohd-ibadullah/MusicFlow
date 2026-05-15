@@ -1,6 +1,10 @@
 {
   "name": "musicflow-server",
   "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mohd-ibadullah/MusicFlow.git"
+  },
   "description": "",
   "main": "server.js",
   "type": "module",

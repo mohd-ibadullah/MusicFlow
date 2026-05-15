@@ -5,7 +5,7 @@
 [![Express 5](https://img.shields.io/badge/Express-5-lightgrey)](https://expressjs.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248)](https://www.mongodb.com/)
 
-Full-stack music web app: React listener client, separate React admin panel, and an Express API with Socket.io, optional Redis, and MongoDB. A production-grade music streaming app built from scratch — real-time listener counts via Socket.io, AI playlist generation, a loop-detection wellbeing system, and a full admin panel with live analytics. Built to understand how streaming products actually work under the hood.
+Full-stack music web app: React listener client, separate React admin panel, and an Express API with Socket.io, optional Redis, and MongoDB. A production-style music streaming app built from scratch — real-time listener counts via Socket.io, AI playlist generation, a loop-detection wellbeing system, and a full admin panel with live analytics. Built to understand how streaming products actually work under the hood.
 
 ---
 
@@ -245,7 +245,7 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
 
 ## Author
 
-Maintained by **MOHD IBADULLAH** · [GitHub](https://github.com/123ibadullah) · [LinkedIn](https://www.linkedin.com/in/mohd-ibadullah-12a046280)
+Maintained by **MOHD IBADULLAH** · [GitHub](https://github.com/mohd-ibadullah/MusicFlow.git) · [LinkedIn](https://www.linkedin.com/in/mohd-ibadullah-12a046280)
 
 ---
 
