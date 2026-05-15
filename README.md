@@ -245,7 +245,7 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
 
 ## Author
 
-Maintained by **MOHD IBADULLAH** · [GitHub](https://github.com/mohd-ibadullah/MusicFlow.git) · [LinkedIn](https://www.linkedin.com/in/mohd-ibadullah-12a046280)
+Maintained by **MOHD IBADULLAH** · [GitHub Profile](https://github.com/mohd-ibadullah) · [LinkedIn](https://www.linkedin.com/in/mohd-ibadullah-12a046280)
 
 ---
 
