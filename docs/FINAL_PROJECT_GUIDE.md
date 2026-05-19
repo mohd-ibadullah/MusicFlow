@@ -481,7 +481,7 @@ OpenRouter path details:
 
 ## 10. Recommendation Engine
 
-The rule-based flow below is still used as a safe fallback path. The newer ML-based layer is documented in Section 23.G.
+The rule-based flow below is still used as a safe fallback path. The newer ML-based layer is documented in Section 23.G. In addition, the listener home page now uses a protected collaborative-filtering endpoint for a separate "People Also Listen To" section.
 
 ### How Personalized Recommendations Work (`songService.js`)
 
@@ -505,6 +505,10 @@ The rule-based flow below is still used as a safe fallback path. The newer ML-ba
 
 ### Anonymous Recommendations
 If no user is logged in (via `optionalAuth` middleware), the engine skips personalization and returns pure trending songs. Cached under `songs:recommendations:anon`.
+
+### Collaborative Filtering Layer
+
+The new CF service reads user likes and recently played songs, computes cosine similarity against other users, and returns songs similar users liked but the target user has not already heard. It is exposed at `GET /api/recommendations/cf/:userId` and uses a 30-minute Redis cache when available.
 
 ---
 
@@ -1010,6 +1014,8 @@ Core modules and endpoints:
 - `server/src/controllers/aiRecommendationController.js` exposes API handlers.
 - `GET /api/ai/recommendations/:userId` returns recommendation lists and source metadata.
 - `POST /api/ai/feedback` records `play`, `like`, `skip`, and `click` interactions in real time.
+- `server/src/services/collaborativeFilteringService.js` computes cosine-similarity recommendations for the home-page CF section.
+- `GET /api/recommendations/cf/:userId` returns collaborative-filtering or trending-fallback results for authenticated users.
 
 How scoring works (interview-ready):
 - Long-term preference: user-item embedding similarity from trained vectors.
@@ -1023,3 +1029,25 @@ Cold-start behavior:
 Operational behavior:
 - Feedback submission invalidates per-user recommendation cache to reflect changes on the next request.
 - API responses include `source`, `fallbackReason`, and `metadata` for observability and debugging.
+
+### H) Realtime Playback Stability Updates
+
+The latest player and Socket.io lifecycle changes focus on preventing stale playback state and ghost listening sessions.
+
+Frontend behavior:
+- Logout dispatches a `musicflow:auth-logout` event before the token is removed.
+- `PlayerContext` listens for that event and resets playback, queue, recommendations, live-listening state, and socket state.
+- Global playback persistence keys (`currentTrack`, `currentPlaylist`, `currentPlaylistIndex`) are cleared and no longer used to restore playback across accounts.
+- The player no longer auto-selects the first catalog song after data load; users start from an empty player until they choose a track.
+- Rapid song switches share one guarded load path that clears stale `canplay`, `error`, and timeout handlers before starting the next load.
+- Socket reconnect now emits the same `user_started_listening` event that the server consumes, including a client session id.
+
+Backend behavior:
+- The default Socket.io namespace now tracks playback sessions by socket id and user id.
+- `user_stopped_listening` and socket disconnect both remove the socket from active user/session maps.
+- Multi-device sessions are represented as multiple sockets under one user, while listener count remains user-based.
+- Admin-protected `GET /api/realtime/diagnostics` reports active playback sessions for development and incident debugging.
+
+Recommendation integration:
+- `recentlyPlayed`, like, and unlike mutations invalidate both legacy recommendation cache keys and versioned collaborative-filtering cache keys.
+- Authenticated `/api/song/recommendations` and `/api/recommendations/cf/:userId` now converge on the same collaborative-filtering service.

@@ -11,6 +11,7 @@ export const useAuth = () => {
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+const AUTH_LOGOUT_EVENT = 'musicflow:auth-logout';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -35,12 +36,14 @@ export const AuthProvider = ({ children }) => {
             setUser(response.data.data.user);
           } else {
             localStorage.removeItem('token');
+            window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
             delete axios.defaults.headers.common['Authorization'];
             setUser(null);
           }
         }
       } catch (error) {
         localStorage.removeItem('token');
+        window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
         delete axios.defaults.headers.common['Authorization'];
         setUser(null);
       } finally {
@@ -57,6 +60,7 @@ export const AuthProvider = ({ children }) => {
       if (e.key !== 'token') return;
 
       if (!e.newValue) {
+        window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
         // Token was removed in another tab → log out here too
         delete axios.defaults.headers.common['Authorization'];
         setUser(null);
@@ -138,6 +142,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);

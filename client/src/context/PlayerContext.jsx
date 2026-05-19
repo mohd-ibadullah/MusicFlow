@@ -18,6 +18,9 @@ export const PlayerContext = createContext();
 const PLAY_COUNT_SAME_SONG_DEDUP_MS = 10000;
 const AI_RECOMMENDATION_LIMIT = 50;
 const REALTIME_EVENT_DEDUP_TTL_MS = 120000;
+const RECOMMENDATION_REFRESH_EVENT = "musicflow:recommendations-refresh";
+const AUTH_LOGOUT_EVENT = "musicflow:auth-logout";
+const PLAYBACK_STORAGE_KEYS = ["currentTrack", "currentPlaylist", "currentPlaylistIndex"];
 
 const unwrapRealtimePayload = (eventEnvelope) => {
   if (eventEnvelope && typeof eventEnvelope === "object" && eventEnvelope.payload) {
@@ -44,6 +47,15 @@ const PlayerContextProvider = (props) => {
     recommendationRequestId: null,
     rankBySongId: new Map(),
   });
+  const playbackLoadRef = useRef({
+    token: 0,
+    timeoutId: null,
+    canPlayHandler: null,
+    errorHandler: null,
+  });
+  const sessionIdRef = useRef(
+    `session_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`,
+  );
 
   useEffect(() => {
     const uid = user?._id ?? user?.id;
@@ -79,15 +91,7 @@ const PlayerContextProvider = (props) => {
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
 
   // Player state
-  const [track, setTrack] = useState(() => {
-    try {
-      const saved = localStorage.getItem("currentTrack");
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return null; // Will fallback to songsData[0] inside getSongsData
-  });
+  const [track, setTrack] = useState(null);
   const [playStatus, setPlayStatus] = useState(false);
   const trackRef = useRef(track);
   // Keep a ref in sync so closures always read the live value
@@ -102,43 +106,32 @@ const PlayerContextProvider = (props) => {
   const [isShuffled, setIsShuffled] = useState(false);
   const [isRepeating, setIsRepeating] = useState(false);
   const [volume, setVolume] = useState(80);
-  const [currentPlaylist, setCurrentPlaylist] = useState(() => {
-    try {
-      const saved = localStorage.getItem("currentPlaylist");
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return [];
-  });
-  const [currentPlaylistIndex, setCurrentPlaylistIndex] = useState(() => {
-    const saved = localStorage.getItem("currentPlaylistIndex");
-    return saved !== null ? parseInt(saved, 10) : 0;
-  });
-
-  // Persist track and queue
-  useEffect(() => {
-    if (track) localStorage.setItem("currentTrack", JSON.stringify(track));
-  }, [track]);
-  useEffect(() => {
-    localStorage.setItem("currentPlaylist", JSON.stringify(currentPlaylist || []));
-  }, [currentPlaylist]);
-  useEffect(() => {
-    localStorage.setItem("currentPlaylistIndex", currentPlaylistIndex.toString());
-  }, [currentPlaylistIndex]);
+  const [currentPlaylist, setCurrentPlaylist] = useState([]);
+  const [currentPlaylistIndex, setCurrentPlaylistIndex] = useState(0);
 
   // User data
   const [likedSongs, setLikedSongs] = useState([]);
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [trendingSongs, setTrendingSongs] = useState([]);
+  const [cfRecommendations, setCfRecommendations] = useState([]);
+  const [cfRecommendationSource, setCfRecommendationSource] = useState(null);
+  const [cfRecommendationDebug, setCfRecommendationDebug] = useState(null);
+  const [cfRecommendationsLoading, setCfRecommendationsLoading] = useState(false);
+  const [recommendationRefreshNonce, setRecommendationRefreshNonce] = useState(0);
   const [liveListening, setLiveListening] = useState([]);
+  const [activeListenersCount, setActiveListenersCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState({
     songs: [],
     albums: [],
     playlists: [],
   });
+
+  const requestRecommendationRefresh = useCallback(() => {
+    setRecommendationRefreshNonce((value) => value + 1);
+    window.dispatchEvent(new CustomEvent(RECOMMENDATION_REFRESH_EVENT));
+  }, []);
 
   // Load data from localStorage on mount (for both authenticated and non-authenticated users)
   useEffect(() => {
@@ -208,12 +201,14 @@ const PlayerContextProvider = (props) => {
 
       if (!response.data.success) {
         setRecentlyPlayed(previousState);
+      } else {
+        requestRecommendationRefresh();
       }
     } catch (error) {
       console.error("Error adding to recently played:", error);
       setRecentlyPlayed(previousState);
     }
-  }, []);
+  }, [requestRecommendationRefresh, url]);
 
   // Use ThemeContext's toast; assume PlayerContext is used within ThemeProvider
   const themeToast = useToast();
@@ -226,6 +221,87 @@ const PlayerContextProvider = (props) => {
     },
     [themeToast],
   );
+
+  const cleanupPendingPlaybackAttempt = useCallback(() => {
+    const audioElement = audioRef.current;
+    const pending = playbackLoadRef.current;
+
+    if (pending.timeoutId) {
+      clearTimeout(pending.timeoutId);
+    }
+
+    if (audioElement && pending.canPlayHandler) {
+      audioElement.removeEventListener("canplay", pending.canPlayHandler);
+    }
+
+    if (audioElement && pending.errorHandler) {
+      audioElement.removeEventListener("error", pending.errorHandler);
+    }
+
+    playbackLoadRef.current = {
+      token: pending.token + 1,
+      timeoutId: null,
+      canPlayHandler: null,
+      errorHandler: null,
+    };
+  }, []);
+
+  const clearPlaybackStorage = useCallback(() => {
+    for (const key of PLAYBACK_STORAGE_KEYS) {
+      localStorage.removeItem(key);
+    }
+  }, []);
+
+  const resetPlaybackSession = useCallback((reason = "reset") => {
+    cleanupPendingPlaybackAttempt();
+    isTransitioningRef.current = false;
+    manuallyLoadedSrcRef.current = null;
+    lastPlayCountedRef.current = { songId: null, at: 0 };
+    recommendationContextRef.current = {
+      source: null,
+      recommendationRequestId: null,
+      rankBySongId: new Map(),
+    };
+
+    const audioElement = audioRef.current;
+    if (audioElement) {
+      try {
+        audioElement.pause();
+        audioElement.currentTime = 0;
+        audioElement.removeAttribute("src");
+        audioElement.load();
+      } catch (error) {
+        console.warn("[Player] Playback reset failed:", error.message);
+      }
+    }
+
+    const sock = socketRef.current;
+    if (sock) {
+      try {
+        sock.emit("user_stopped_listening", {
+          userId: listenerIdRef.current,
+          sessionId: sessionIdRef.current,
+          reason,
+        });
+        sock.disconnect();
+      } catch (error) {
+        console.warn("[Socket] Disconnect during playback reset failed:", error.message);
+      }
+      socketRef.current = null;
+    }
+
+    clearPlaybackStorage();
+    setTrack(null);
+    trackRef.current = null;
+    setPlayStatus(false);
+    playStatusRef.current = false;
+    setCurrentPlaylist([]);
+    setCurrentPlaylistIndex(0);
+    setIsShuffled(false);
+    setIsRepeating(false);
+    setLiveListening([]);
+    setActiveListenersCount(0);
+  }, [cleanupPendingPlaybackAttempt, clearPlaybackStorage]);
 
   const shouldProcessRealtimeEvent = useCallback((eventEnvelope) => {
     const eventId = eventEnvelope?.eventId;
@@ -372,6 +448,7 @@ const PlayerContextProvider = (props) => {
 
     sock.emit("user_started_listening", {
       userId: listenerId,
+      sessionId: sessionIdRef.current,
       songId: currentTrack?._id || null,
       songName: currentTrack?.name || null,
       userName: userRef.current?.name || "Anonymous"
@@ -387,7 +464,10 @@ const PlayerContextProvider = (props) => {
 
     if (!sock || !listenerId) return;
 
-    sock.emit("user_stopped_listening", { userId: listenerId });
+    sock.emit("user_stopped_listening", {
+      userId: listenerId,
+      sessionId: sessionIdRef.current,
+    });
   }, []);
 
   // Player controls
@@ -414,6 +494,104 @@ const PlayerContextProvider = (props) => {
       // Socket emit is handled exclusively by el.onpause (audio element callback)
     }
   }, []);
+
+  useEffect(() => {
+    clearPlaybackStorage();
+  }, [clearPlaybackStorage]);
+
+  useEffect(() => {
+    const handleLogout = () => {
+      resetPlaybackSession("logout");
+      setLikedSongs([]);
+      setRecentlyPlayed([]);
+      setRecommendations([]);
+      setCfRecommendations([]);
+      setCfRecommendationSource(null);
+      setCfRecommendationDebug(null);
+      setCfRecommendationsLoading(false);
+      setPlaylists([]);
+    };
+
+    window.addEventListener(AUTH_LOGOUT_EVENT, handleLogout);
+    return () => window.removeEventListener(AUTH_LOGOUT_EVENT, handleLogout);
+  }, [resetPlaybackSession]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      resetPlaybackSession("auth_state_unauthenticated");
+    }
+  }, [isAuthenticated, resetPlaybackSession]);
+
+  const startPlaybackForSong = useCallback((song, source = "direct") => {
+    const audioElement = audioRef.current;
+    const src = song?.file || song?.url || song?.src || song?.audio || "";
+    if (!audioElement || !src) return;
+
+    cleanupPendingPlaybackAttempt();
+    const token = playbackLoadRef.current.token + 1;
+    isTransitioningRef.current = true;
+    manuallyLoadedSrcRef.current = src;
+
+    let timeoutId = null;
+    const clearCurrentAttempt = () => {
+      clearTimeout(timeoutId);
+      audioElement.removeEventListener("canplay", canPlayHandler);
+      audioElement.removeEventListener("error", errorHandler);
+      playbackLoadRef.current = {
+        token,
+        timeoutId: null,
+        canPlayHandler: null,
+        errorHandler: null,
+      };
+    };
+
+    const canPlayHandler = () => {
+      if (playbackLoadRef.current.token !== token) return;
+      clearCurrentAttempt();
+      audioElement
+        .play()
+        .then(() => {
+          setPlayStatus(true);
+        })
+        .catch((error) => {
+          if (playbackLoadRef.current.token !== token) return;
+          isTransitioningRef.current = false;
+          console.error(`${source} play error:`, error);
+          setPlayStatus(false);
+        });
+    };
+
+    const errorHandler = () => {
+      if (playbackLoadRef.current.token !== token) return;
+      clearCurrentAttempt();
+      isTransitioningRef.current = false;
+      console.error("Audio load error for:", src);
+      showToast("Failed to load song. Please try another song.", "error");
+      setPlayStatus(false);
+    };
+
+    timeoutId = setTimeout(() => {
+      if (playbackLoadRef.current.token !== token) return;
+      clearCurrentAttempt();
+      isTransitioningRef.current = false;
+      setPlayStatus(false);
+      showToast("Song is taking too long to load. Please try again.", "error");
+    }, 10000);
+
+    playbackLoadRef.current = {
+      token,
+      timeoutId,
+      canPlayHandler,
+      errorHandler,
+    };
+
+    audioElement.addEventListener("canplay", canPlayHandler);
+    audioElement.addEventListener("error", errorHandler);
+    audioElement.pause();
+    audioElement.currentTime = 0;
+    audioElement.src = src;
+    audioElement.load();
+  }, [cleanupPendingPlaybackAttempt, showToast]);
 
   const togglePlay = useCallback(() => {
     if (playStatus) {
@@ -467,6 +645,9 @@ const PlayerContextProvider = (props) => {
         setTrack(song);
         trackRef.current = song; // Update ref immediately for socket emissions
         addToRecentlyPlayed(song);
+        startPlaybackForSong(song, "playWithId");
+        showToast(`Now playing: ${song.name}`, "success");
+        return;
 
         if (audioRef.current) {
           // Mark transition so emitStoppedListening is suppressed during load
@@ -536,6 +717,7 @@ const PlayerContextProvider = (props) => {
       showToast,
       play,
       pause,
+      startPlaybackForSong,
     ],
   );
 
@@ -606,34 +788,16 @@ const PlayerContextProvider = (props) => {
     if (nextSong) {
       setCurrentPlaylistIndex(nextIndex);
       setTrack(nextSong);
+      trackRef.current = nextSong;
       addToRecentlyPlayed(nextSong);
-
-      if (audioRef.current) {
-        isTransitioningRef.current = true;
-        manuallyLoadedSrcRef.current = nextSong.file || nextSong.url || nextSong.src || nextSong.audio || "";
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current.src = manuallyLoadedSrcRef.current;
-        audioRef.current.load();
-        // { once: true } prevents handler accumulation from rapid next() calls
-        audioRef.current.addEventListener("canplay", () => {
-          audioRef.current.play()
-            .then(() => {
-              setPlayStatus(true);
-              // Socket emit + transition flag cleared exclusively by el.onplay
-            })
-            .catch((err) => {
-              isTransitioningRef.current = false;
-              console.error("next() play error:", err);
-            });
-        }, { once: true });
-      }
+      startPlaybackForSong(nextSong, "next");
     }
   }, [
     currentPlaylist,
     currentPlaylistIndex,
     isShuffled,
     addToRecentlyPlayed,
+    startPlaybackForSong,
     isAuthenticated,
     url,
   ]);
@@ -651,30 +815,11 @@ const PlayerContextProvider = (props) => {
     if (prevSong) {
       setCurrentPlaylistIndex(prevIndex);
       setTrack(prevSong);
+      trackRef.current = prevSong;
       addToRecentlyPlayed(prevSong);
-
-      if (audioRef.current) {
-        isTransitioningRef.current = true;
-        manuallyLoadedSrcRef.current = prevSong.file || prevSong.url || prevSong.src || prevSong.audio || "";
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current.src = manuallyLoadedSrcRef.current;
-        audioRef.current.load();
-        // { once: true } prevents handler accumulation from rapid previous() calls
-        audioRef.current.addEventListener("canplay", () => {
-          audioRef.current.play()
-            .then(() => {
-              setPlayStatus(true);
-              // Socket emit + transition flag cleared exclusively by el.onplay
-            })
-            .catch((err) => {
-              isTransitioningRef.current = false;
-              console.error("previous() play error:", err);
-            });
-        }, { once: true });
-      }
+      startPlaybackForSong(prevSong, "previous");
     }
-  }, [currentPlaylist, currentPlaylistIndex, addToRecentlyPlayed]);
+  }, [currentPlaylist, currentPlaylistIndex, addToRecentlyPlayed, startPlaybackForSong]);
 
   const seekSong = useCallback((e) => {
     if (
@@ -769,6 +914,7 @@ const PlayerContextProvider = (props) => {
             isCurrentlyLiked ? `Removed "${song.name}" from liked songs` : `Added "${song.name}" to liked songs`,
             isCurrentlyLiked ? "info" : "success"
           );
+          requestRecommendationRefresh();
         }
       } catch (error) {
         console.error("Error toggling like:", error);
@@ -777,7 +923,7 @@ const PlayerContextProvider = (props) => {
         showToast("Failed to update liked songs", "error");
       }
     },
-    [likedSongs, songsData, showToast],
+    [likedSongs, requestRecommendationRefresh, showToast, songsData, url],
   );
 
   const isSongLiked = useCallback(
@@ -1170,10 +1316,6 @@ const PlayerContextProvider = (props) => {
         try {
           const sampleModule = await import("../data/sampleData");
           setSongsData(sampleModule.sampleSongs);
-          if (!track && sampleModule.sampleSongs.length > 0) {
-            setTrack(sampleModule.sampleSongs[0]);
-            setCurrentPlaylist(sampleModule.sampleSongs);
-          }
           return;
         } catch (impErr) {
           console.warn("No sample songs available", impErr);
@@ -1181,27 +1323,18 @@ const PlayerContextProvider = (props) => {
       }
 
       setSongsData(songs);
-
-      if (songs.length > 0 && !track) {
-        setTrack(songs[0]);
-        setCurrentPlaylist(songs);
-      }
     } catch (error) {
       console.error("Error fetching songs:", error);
       // Fallback to sample data on error
       try {
         const sampleModule = await import("../data/sampleData");
         setSongsData(sampleModule.sampleSongs);
-        if (!track && sampleModule.sampleSongs.length > 0) {
-          setTrack(sampleModule.sampleSongs[0]);
-          setCurrentPlaylist(sampleModule.sampleSongs);
-        }
       } catch (impErr) {
         console.error("No sample songs available", impErr);
         setSongsData([]);
       }
     }
-  }, [track]);
+  }, []);
 
   const getAlbumsData = useCallback(async () => {
     try {
@@ -1304,22 +1437,45 @@ const PlayerContextProvider = (props) => {
       const authUserId = userRef.current?._id || userRef.current?.id || null;
 
       if (isAuthenticated && authUserId) {
+        setCfRecommendationsLoading(true);
         try {
-          const aiRes = await axios.get(`${url}/api/ai/recommendations`, {
-            params: { limit: AI_RECOMMENDATION_LIMIT },
-          });
+          const cfRes = await axios.get(
+            `${url}/api/recommendations/cf/${authUserId}`,
+            {
+              params: {
+                limit: AI_RECOMMENDATION_LIMIT,
+                refresh: recommendationRefreshNonce,
+              },
+              headers: {
+                "Cache-Control": "no-cache",
+                Pragma: "no-cache",
+              },
+            },
+          );
 
-          if (aiRes.data?.success && Array.isArray(aiRes.data.recommendations)) {
-            recs = aiRes.data.recommendations;
-            recommendationRequestId = aiRes.data.recommendationRequestId || null;
-            recommendationSource = "ai-endpoint";
+          if (cfRes.data?.success && Array.isArray(cfRes.data.songs)) {
+            recs = cfRes.data.songs.slice(0, AI_RECOMMENDATION_LIMIT);
+            recommendationRequestId = cfRes.data.debug?.requestId || null;
+            recommendationSource = `collaborative-filtering:${cfRes.data.source || "unknown"}`;
+            setCfRecommendations(recs);
+            setCfRecommendationSource(cfRes.data.source || null);
+            setCfRecommendationDebug(cfRes.data.debug || null);
+          } else {
+            setCfRecommendations([]);
+            setCfRecommendationSource(null);
+            setCfRecommendationDebug(null);
           }
-        } catch (aiErr) {
-          console.warn("AI recommendations fetch failed:", aiErr.message);
+        } catch (cfErr) {
+          console.warn("Collaborative filtering fetch failed:", cfErr.message);
+          setCfRecommendations([]);
+          setCfRecommendationSource(null);
+          setCfRecommendationDebug(null);
+        } finally {
+          setCfRecommendationsLoading(false);
         }
       }
 
-      if (recs.length === 0) {
+      if (!isAuthenticated && recs.length === 0) {
         try {
           const recRes = await axios.get(`${url}/api/song/recommendations`);
 
@@ -1350,6 +1506,12 @@ const PlayerContextProvider = (props) => {
         ? recs.slice(0, AI_RECOMMENDATION_LIMIT)
         : [];
       setRecommendations(normalizedRecs);
+      if (!isAuthenticated || !authUserId) {
+        setCfRecommendations([]);
+        setCfRecommendationSource(null);
+        setCfRecommendationDebug(null);
+        setCfRecommendationsLoading(false);
+      }
 
       const rankBySongId = new Map();
       for (let index = 0; index < normalizedRecs.length; index += 1) {
@@ -1382,7 +1544,7 @@ const PlayerContextProvider = (props) => {
         rankBySongId: new Map(),
       };
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, recommendationRefreshNonce, url]);
 
   // Initialize data on mount and when authentication changes
   useEffect(() => {
@@ -1400,14 +1562,18 @@ const PlayerContextProvider = (props) => {
       setLikedSongs([]);
       setRecentlyPlayed([]);
     }
-  }, [isAuthenticated]); // Run when authentication status changes
+  }, [isAuthenticated, recommendationRefreshNonce]); // Run when auth or recommendation data changes
 
   // Socket.IO: live listening activity
-  const [activeListenersCount, setActiveListenersCount] = useState(0);
   const isSocketConnectedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
+    if (!isAuthenticated) {
+      return () => {
+        mounted = false;
+      };
+    }
     const token = localStorage.getItem("token");
     const socketTarget = url || undefined;
 
@@ -1694,9 +1860,10 @@ const PlayerContextProvider = (props) => {
         isSocketConnectedRef.current = true;
         socket.emit("get_listeners");
         if (playStatusRef.current && trackRef.current?._id) {
-          socket.emit("started_listening", {
+          socket.emit("user_started_listening", {
             songId: trackRef.current._id,
             songName: trackRef.current.name,
+            sessionId: sessionIdRef.current,
             userId:
               userRef.current?._id ||
               userRef.current?.id ||
@@ -1773,6 +1940,9 @@ const PlayerContextProvider = (props) => {
       }
     };
   }, [
+    isAuthenticated,
+    user?._id,
+    user?.id,
     url,
     removeAlbumFromState,
     removePlaylistFromState,
@@ -1880,6 +2050,10 @@ const PlayerContextProvider = (props) => {
       recentlyPlayed,
       recommendations,
       trendingSongs,
+      cfRecommendations,
+      cfRecommendationSource,
+      cfRecommendationDebug,
+      cfRecommendationsLoading,
       liveListening,
       activeListenersCount,
 
@@ -1903,6 +2077,7 @@ const PlayerContextProvider = (props) => {
 
       // Data refreshing
       getPlaylistsData,
+      requestRecommendationRefresh,
     }),
     [
       track,
@@ -1917,6 +2092,10 @@ const PlayerContextProvider = (props) => {
       recentlyPlayed,
       recommendations,
       trendingSongs,
+      cfRecommendations,
+      cfRecommendationSource,
+      cfRecommendationDebug,
+      cfRecommendationsLoading,
       liveListening,
       activeListenersCount,
       searchQuery,
@@ -1940,6 +2119,7 @@ const PlayerContextProvider = (props) => {
       removeSongFromPlaylist,
       getPlaylistsData,
       fetchRecommendationsAndTrending,
+      requestRecommendationRefresh,
     ],
   );
 

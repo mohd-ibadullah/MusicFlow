@@ -33,6 +33,8 @@ import authRouter from "./src/routes/authRoutes.js";
 import adminRouter from "./src/routes/adminRouter.js";
 import loopDiagnosisRouter from "./src/routes/loopDiagnosis.js";
 import aiRouter from "./src/routes/aiRouter.js";
+import recommendationRouter from "./src/routes/recommendationRouter.js";
+import { authenticateToken, authorizeAdmin } from "./src/middleware/authMiddleware.js";
 import { startAIRetrainingScheduler } from "./src/ai/retrainingPipeline.js";
 
 // Import models to ensure they're registered before routes
@@ -71,36 +73,8 @@ startAIRetrainingScheduler();
 app.use(helmet()); // Secure HTTP headers
 app.use(express.json());
 
-// Strict CORS domain matching
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean)
-  : [
-      "http://localhost:5000",
-      "http://localhost:5001",
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "http://127.0.0.1:5000",
-      "http://127.0.0.1:5001",
-      "http://127.0.0.1:5173",
-      "http://127.0.0.1:5174",
-    ];
-
-const isAllowedOrigin = (origin) => {
-  const isLocalDevOrigin =
-    process.env.NODE_ENV !== "production" &&
-    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin || "");
-
-  return !origin || allowedOrigins.includes(origin) || isLocalDevOrigin;
-};
-
 app.use(cors({
-  origin: function (origin, callback) {
-    if (isAllowedOrigin(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true,
   credentials: true
 }));
 
@@ -173,6 +147,7 @@ app.use("/api/playlist", playlistRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/loop-diagnosis", loopDiagnosisRouter);
 app.use("/api/ai", aiRouter);
+app.use("/api/recommendations", recommendationRouter);
 
 // Serve frontend (SPA) from built dist folder
 
@@ -210,6 +185,26 @@ if (resolvedFrontendPath) {
   );
 } // End of static serving logic
 
+app.get("/api/realtime/diagnostics", authenticateToken, authorizeAdmin, (req, res) => {
+  const activeSessions = [...playbackSessionsBySocket.values()].map((session) => ({
+    socketId: session.socketId,
+    userId: session.userId,
+    sessionId: session.sessionId,
+    songId: session.songId,
+    songName: session.songName,
+    startedAt: session.startedAt,
+    lastSeenAt: session.lastSeenAt,
+  }));
+
+  res.json({
+    success: true,
+    activeUserCount: activeUsersMap.size,
+    socketCount: socketToUserMap.size,
+    playbackSessionCount: playbackSessionsBySocket.size,
+    activeSessions,
+  });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   logger.error("Server error", { error: err?.message || String(err) });
@@ -231,13 +226,7 @@ app.use((req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      if (isAllowedOrigin(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: true,
     credentials: true
   },
   pingTimeout: 60000,
@@ -247,9 +236,12 @@ initLoopDiagnosisSocket(io);
 
 const activeUsersMap = new Map();
 const socketToUserMap = new Map();
+const playbackSessionsBySocket = new Map();
+const playbackSessionsByUser = new Map();
 
 // Optional: you can still set maps to app if needed elsewhere
 app.set("activeUsersMap", activeUsersMap);
+app.set("playbackSessionsByUser", playbackSessionsByUser);
 
 import { isRedisAvailable, getRedisClient } from "./src/config/redis.js";
 import { cacheGetLiveEvents } from "./src/services/cacheService.js";
@@ -331,6 +323,27 @@ io.on("connection", (socket) => {
     // Rely on provided userId, fallback to socket id for anon sessions
     const userId = authenticatedUserId || data?.userId || socket.id;
     socketToUserMap.set(socket.id, userId);
+    const now = new Date().toISOString();
+    const previousSession = playbackSessionsBySocket.get(socket.id);
+    if (previousSession?.userId && playbackSessionsByUser.has(previousSession.userId)) {
+      playbackSessionsByUser.get(previousSession.userId).delete(socket.id);
+    }
+
+    const playbackSession = {
+      socketId: socket.id,
+      userId,
+      sessionId: data?.sessionId?.toString?.() || socket.id,
+      songId: data?.songId?.toString?.() || null,
+      songName: data?.songName || null,
+      userName: data?.userName || "Anonymous",
+      startedAt: previousSession?.startedAt || now,
+      lastSeenAt: now,
+    };
+    playbackSessionsBySocket.set(socket.id, playbackSession);
+    if (!playbackSessionsByUser.has(userId)) {
+      playbackSessionsByUser.set(userId, new Map());
+    }
+    playbackSessionsByUser.get(userId).set(socket.id, playbackSession);
 
     socket.join(`user:${userId}`);
 
@@ -350,11 +363,26 @@ io.on("connection", (socket) => {
     }
 
     broadcastListenerCount();
+    logger.debug("[Realtime] Playback session started", {
+      userId,
+      socketId: socket.id,
+      sessionId: playbackSession.sessionId,
+      songId: playbackSession.songId,
+      activeSocketsForUser: playbackSessionsByUser.get(userId)?.size || 0,
+    });
   });
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = async (reason = "disconnect") => {
     const userId = socketToUserMap.get(socket.id);
     if (!userId) return;
+    playbackSessionsBySocket.delete(socket.id);
+    const userSessions = playbackSessionsByUser.get(userId);
+    if (userSessions) {
+      userSessions.delete(socket.id);
+      if (userSessions.size === 0) {
+        playbackSessionsByUser.delete(userId);
+      }
+    }
 
     if (isRedisAvailable()) {
       try {
@@ -380,10 +408,16 @@ io.on("connection", (socket) => {
     
     socketToUserMap.delete(socket.id);
     broadcastListenerCount();
+    logger.debug("[Realtime] Playback session stopped", {
+      userId,
+      socketId: socket.id,
+      reason,
+      remainingSocketsForUser: playbackSessionsByUser.get(userId)?.size || 0,
+    });
   };
 
-  socket.on("user_stopped_listening", handleDisconnect);
-  socket.on("disconnect", handleDisconnect);
+  socket.on("user_stopped_listening", (data = {}) => handleDisconnect(data?.reason || "client_stop"));
+  socket.on("disconnect", (reason) => handleDisconnect(reason));
 
   // Handle request for current listener count
   socket.on("get_listeners", async () => {

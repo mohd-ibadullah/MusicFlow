@@ -18,7 +18,7 @@ Playlist apps are easy to mock in a UI. They are harder to get right when play c
 ## What it does (for real)
 
 **Listener (`client/`)**  
-Sign up, log in, browse albums, play audio with a global player, like songs, build playlists, run an AI playlist generator (prompt in → query and rank from Mongo only), see recommendations, search the library, and—if enabled—get loop-detection nudges when the same song repeats a lot.
+Sign up, log in, browse albums, play audio with a global player, like songs, build playlists, run an AI playlist generator (prompt in → query and rank from Mongo only), see recommendations plus a collaborative-filtering "People Also Listen To" feed, search the library, and—if enabled—get loop-detection nudges when the same song repeats a lot.
 
 **Admin (`admin/`)**  
 JWT-protected dashboard: add/delete songs and albums (Cloudinary uploads), charts (aggregations), live-ish activity feed, loop-diagnosis stats.
@@ -195,13 +195,17 @@ When enabled, Redis backs cache helpers and loop-diagnosis counters/session keys
 
 Used for live listener counts, pushing recent listening events, admin activity, and the `/loopDiagnosis` namespace for wellbeing-style interventions. The server deduplicates socket ↔ user mappings and can mirror “who is listening” in Redis when available.
 
+Playback sessions are explicitly cleaned up on logout, token removal in another tab, socket disconnect, and song stop events. The client does not restore a global `currentTrack` from localStorage, so a later login or a different account cannot inherit stale playback state. The realtime server tracks active playback by socket and session and exposes admin-protected `GET /api/realtime/diagnostics` for development-time inspection.
+
 **LLM usage (playlists)** — `POST /api/playlist/generate` uses OpenRouter to interpret prompt intent and always pulls song IDs from MongoDB (never LLM output).
 
 When `LLM_PROVIDER=openrouter`, the backend hits the OpenRouter Chat Completions API at `https://openrouter.ai/api/v1`.
 
 ### Recommendations
 
-Hybrid scoring: embedding similarity plus recent feedback signals (`play`, `like`, `skip`, …). Cold users get heuristic mixes until there is enough signal. Optional `data/data.json` export feeds mapping logic when you run the embedding pipeline scripts.
+Authenticated recommendation UI is driven by `GET /api/recommendations/cf/:userId`. The collaborative-filtering service builds a weighted identity profile from likes and recently played songs, reinforces dominant language/taste clusters, and only uses trending fallback when CF candidates are insufficient.
+
+The older authenticated `/api/song/recommendations` route is kept backward compatible by routing to the same CF service. Likes, unlikes, and recently played updates invalidate both legacy recommendation cache keys and versioned CF cache keys, so recommendation identity updates immediately after playback or feedback.
 
 ---
 

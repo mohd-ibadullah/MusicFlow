@@ -13,7 +13,11 @@ const RECOMMENDATION_LIMIT = 50;
 const RecommendedSongsPage = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { playWithId, recommendations: contextRecommendations } = usePlayer();
+  const {
+    playWithId,
+    cfRecommendations: contextRecommendations,
+    requestRecommendationRefresh,
+  } = usePlayer();
   const { isAuthenticated, user } = useAuth();
   const [recommendations, setRecommendations] = useState(contextRecommendations || []);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,14 +34,22 @@ const RecommendedSongsPage = () => {
         const authUserId = user?._id || user?.id || null;
         const endpoint =
           isAuthenticated && authUserId
-            ? `${apiBase}/api/ai/recommendations?limit=${RECOMMENDATION_LIMIT}`
+            ? `${apiBase}/api/recommendations/cf/${authUserId}?limit=${RECOMMENDATION_LIMIT}&refresh=${Date.now()}`
             : `${apiBase}/api/song/recommendations`;
 
-        const res = await axios.get(endpoint);
+        const res = await axios.get(endpoint, {
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
         if (cancelled) return;
-        const data = Array.isArray(res.data?.recommendations)
-          ? res.data.recommendations
-          : [];
+        const data =
+          Array.isArray(res.data?.songs)
+            ? res.data.songs
+            : Array.isArray(res.data?.recommendations)
+              ? res.data.recommendations
+              : [];
         setRecommendations(data.slice(0, RECOMMENDATION_LIMIT));
       } catch (err) {
         if (cancelled) return;
@@ -53,11 +65,12 @@ const RecommendedSongsPage = () => {
     };
 
     fetchRecommendations();
+    requestRecommendationRefresh?.();
 
     return () => {
       cancelled = true;
     };
-  }, [apiBase, isAuthenticated, user]);
+  }, [apiBase, isAuthenticated, requestRecommendationRefresh, user]);
 
   const hasSongs = useMemo(
     () => Array.isArray(recommendations) && recommendations.length > 0,

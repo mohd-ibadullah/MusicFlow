@@ -21,7 +21,9 @@ const DisplayHome = () => {
     searchResults,
     likedSongs,
     recentlyPlayed,
-    recommendations,
+    cfRecommendations,
+    cfRecommendationSource,
+    cfRecommendationsLoading,
     trendingSongs,
     liveListening,
     playWithId
@@ -34,8 +36,7 @@ const DisplayHome = () => {
     likedSongs: 0,
     playlists: 0,
     featuredCharts: 0,
-    biggestHits: 0,
-    recommendations: 0
+    biggestHits: 0
   });
 
   const ITEMS_PER_PAGE = 8;
@@ -82,7 +83,7 @@ const DisplayHome = () => {
     playlists: playlists.length > 0,
     featuredCharts: albumsData.length > 0,
     biggestHits: biggestHitsSongs.length > 0,
-    recommendations: (recommendations || []).length > 0,
+    cfRecommendations: (cfRecommendations || []).length > 0,
     trending: (trendingSongs || []).length > 0,
     searchResults: searchResults.songs.length > 0 || searchResults.albums.length > 0 || searchResults.playlists.length > 0
   };
@@ -352,17 +353,34 @@ const DisplayHome = () => {
         </section>
       )}
 
-      {/* Recommended For You */}
-      {hasData.recommendations && (
+      {/* Personalized recommendations */}
+      {cfRecommendationsLoading ? (
+        <section className="animate-slide-up">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                Recommended for you
+              </h2>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                Based on your listening identity
+              </p>
+            </div>
+          </div>
+          <div className="songs-grid">
+            <SkeletonLoader type="card" count={4} />
+          </div>
+        </section>
+      ) : hasData.cfRecommendations ? (
         <CarouselSection
-          title="Made for you"
-          items={recommendations}
-          totalCount={recommendations.length}
+          title={cfRecommendationSource === "trending_fallback" ? "Trending right now" : "Recommended for you"}
+          subtitle={cfRecommendationSource === "trending_fallback" ? "Fresh picks while we learn your taste" : "Collaborative picks from listeners with similar taste"}
+          items={cfRecommendations}
+          totalCount={cfRecommendations.length}
           seeAllRoute="/songs/recommended"
-          scrollKey="recommendations"
-          renderItem={(item) => <SongCard song={item} playlist={recommendations} />}
+          scrollKey="cfRecommendations"
+          renderItem={(item) => <SongCard song={item} playlist={cfRecommendations} />}
         />
-      )}
+      ) : null}
 
       {/* Trending Now */}
       {hasData.trending && (

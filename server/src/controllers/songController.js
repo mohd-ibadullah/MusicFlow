@@ -4,8 +4,9 @@ import Song from "../models/songModel.js";
 import User from "../models/userModel.js";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
-import { cacheGet, cacheSet, cacheDel, CACHE_KEYS, invalidateSongStructuralCaches, cachePushLiveEvent } from "../services/cacheService.js";
+import { cacheGet, cacheSet, cacheDel, cacheInvalidatePattern, CACHE_KEYS, invalidateSongStructuralCaches, cachePushLiveEvent } from "../services/cacheService.js";
 import * as songService from "../services/songService.js";
+import { getCollaborativeFilteringRecommendations as getCollaborativeFilteringRecommendationsService } from "../services/collaborativeFilteringService.js";
 import logActivity from "../utils/logActivity.js";
 import { getRedisClient } from "../config/redis.js";
 import { logAIInteraction } from "../ai/telemetryService.js";
@@ -34,6 +35,20 @@ const rebuildSongCaches = async () => {
     // Rebuild complete
   } catch (err) {
     console.warn(`[CACHE] Rebuild error:`, err.message);
+  }
+};
+
+const invalidateUserRecommendationCaches = async (userId) => {
+  const normalizedUserId = userId?.toString?.() || userId;
+  if (!normalizedUserId) return;
+
+  try {
+    await Promise.all([
+      cacheDel(CACHE_KEYS.RECOMMENDATIONS(normalizedUserId)),
+      cacheInvalidatePattern(`cf:*:${normalizedUserId}:*`),
+    ]);
+  } catch (error) {
+    console.warn("[CACHE] Failed clearing user recommendation caches:", error.message);
   }
 };
 
@@ -430,11 +445,7 @@ export const likeSong = async (req, res) => {
         console.warn("[AI] Like feedback logging failed:", error.message);
       }
 
-      try {
-        await cacheDel(CACHE_KEYS.RECOMMENDATIONS(userId.toString()));
-      } catch (error) {
-        console.warn("[CACHE] Failed clearing recommendations cache after like:", error.message);
-      }
+      await invalidateUserRecommendationCaches(userId);
 
       // Statistics update: Skip global purge to avoid cache thrashing. 
       // Individual counters sync via TTL or next structural rebuild.
@@ -527,11 +538,7 @@ export const unlikeSong = async (req, res) => {
         { $set: { likeCount: { $max: [{ $subtract: ["$likeCount", 1] }, 0] } } },
       ], { new: true });
 
-      try {
-        await cacheDel(CACHE_KEYS.RECOMMENDATIONS(userId.toString()));
-      } catch (error) {
-        console.warn("[CACHE] Failed clearing recommendations cache after unlike:", error.message);
-      }
+      await invalidateUserRecommendationCaches(userId);
 
       // Broadcast analytics update instantly
       try {
@@ -652,11 +659,7 @@ export const addToRecentlyPlayed = async (req, res) => {
       });
     }
 
-    try {
-      await cacheDel(CACHE_KEYS.RECOMMENDATIONS(userId.toString()));
-    } catch (error) {
-      console.warn("[CACHE] Failed clearing recommendations cache after recently played update:", error.message);
-    }
+    await invalidateUserRecommendationCaches(userId);
 
     res.status(200).json({
       success: true,
@@ -754,8 +757,27 @@ export const getRecentlyPlayed = async (req, res) => {
 export const getRecommendations = async (req, res) => {
   try {
     const userId = req.user?.userId;
+    const parsedLimit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+
+    if (userId) {
+      const result = await getCollaborativeFilteringRecommendationsService({
+        userId: userId.toString(),
+        limit: parsedLimit,
+        forceRefresh: Boolean(req.query.refresh) || req.query.cache === "false",
+      });
+
+      res.set("Cache-Control", "no-store");
+      return res.status(200).json({
+        success: true,
+        source: result.source,
+        recommendations: result.songs,
+        count: result.count,
+        debug: result.debug,
+      });
+    }
+
     const cacheKey = CACHE_KEYS.RECOMMENDATIONS(
-      userId ? userId.toString() : "anon",
+      "anon",
     );
     const cached = await cacheGet(cacheKey);
     if (cached) {
@@ -766,9 +788,7 @@ export const getRecommendations = async (req, res) => {
       });
     }
 
-    const recommended = await songService.getRecommendations({
-      userId: userId?.toString(),
-    });
+    const recommended = await songService.getRecommendations({});
 
     await cacheSet(
       cacheKey,
@@ -820,6 +840,49 @@ export const getTrendingSongs = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching trending songs",
+    });
+  }
+};
+
+export const getCollaborativeFilteringRecommendations = async (req, res) => {
+  try {
+    const authenticatedUserId = req.user?.userId?.toString?.();
+    const requestedUserId = req.params?.userId?.toString?.();
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+
+    if (!authenticatedUserId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    if (!requestedUserId || requestedUserId !== authenticatedUserId) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied for requested user",
+      });
+    }
+
+    const result = await getCollaborativeFilteringRecommendationsService({
+      userId: authenticatedUserId,
+      limit,
+      forceRefresh: Boolean(req.query.refresh) || req.query.cache === "false",
+    });
+
+    res.set("Cache-Control", "no-store");
+    return res.status(200).json({
+      success: true,
+      source: result.source,
+      count: result.count,
+      songs: result.songs,
+      debug: result.debug,
+    });
+  } catch (error) {
+    console.error("Get collaborative filtering recommendations error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching collaborative filtering recommendations",
     });
   }
 };

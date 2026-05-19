@@ -10,7 +10,7 @@ import {
   logRecommendationServed,
 } from "../ai/telemetryService.js";
 import { runEmbeddingRetrainingCycle } from "../ai/retrainingPipeline.js";
-import { cacheDel, CACHE_KEYS } from "../services/cacheService.js";
+import { cacheDel, cacheInvalidatePattern, CACHE_KEYS } from "../services/cacheService.js";
 import {
   sendServerError,
   sendUnauthorizedError,
@@ -121,7 +121,10 @@ export const submitAIInteractionFeedback = async (req, res) => {
     }
 
     if (userId) {
-      cacheDel(CACHE_KEYS.RECOMMENDATIONS(userId.toString())).catch((error) => {
+      Promise.all([
+        cacheDel(CACHE_KEYS.RECOMMENDATIONS(userId.toString())),
+        cacheInvalidatePattern(`cf:*:${userId.toString()}:*`),
+      ]).catch((error) => {
         logger.warn("[AI] Failed to clear fallback recommendation cache", {
           error: error.message,
         });

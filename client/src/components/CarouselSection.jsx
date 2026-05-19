@@ -15,6 +15,7 @@ const ITEMS_PER_PAGE = 4;
  */
 const CarouselSection = ({
   title,
+  subtitle,
   items = [],
   totalCount,
   seeAllRoute,
@@ -54,9 +55,13 @@ const CarouselSection = ({
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{title}</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            {items.length} {items.length === 1 ? "item" : "items"}
-          </p>
+          {subtitle ? (
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{subtitle}</p>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+              {items.length} {items.length === 1 ? "item" : "items"}
+            </p>
+          )}
         </div>
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
