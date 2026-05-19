@@ -1,5 +1,5 @@
 # MusicFlow
-
+🚀 **Live Demo:** [music-flow-vqmp.vercel.app](https://music-flow-vqmp.vercel.app)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 [![Node.js 20+](https://img.shields.io/badge/node.js-%3E%3D20-darkgreen)](https://nodejs.org/)
 [![Express 5](https://img.shields.io/badge/Express-5-lightgrey)](https://expressjs.com/)
@@ -249,7 +249,7 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
 
 ## Author
 
-Maintained by **MOHD IBADULLAH** · [GitHub](https://github.com/mohd-ibadullah/MusicFlow.git) · [LinkedIn](https://www.linkedin.com/in/mohd-ibadullah-12a046280)
+Maintained by **MOHD IBADULLAH** · [GitHub Profile](https://github.com/mohd-ibadullah) · [LinkedIn](https://www.linkedin.com/in/mohd-ibadullah-4786b640a/)
 
 ---
 
