@@ -647,64 +647,6 @@ const PlayerContextProvider = (props) => {
         addToRecentlyPlayed(song);
         startPlaybackForSong(song, "playWithId");
         showToast(`Now playing: ${song.name}`, "success");
-        return;
-
-        if (audioRef.current) {
-          // Mark transition so emitStoppedListening is suppressed during load
-          isTransitioningRef.current = true;
-          // Tell [track] effect this src is already being loaded — skip double-load
-          manuallyLoadedSrcRef.current = song.file;
-
-          // Stop current playback
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-
-          // Set new source
-          audioRef.current.src = song.file;
-          audioRef.current.load();
-
-          // Wait for audio to be ready
-          const handleCanPlay = () => {
-            audioRef.current.removeEventListener("canplay", handleCanPlay);
-            audioRef.current
-              .play()
-              .then(() => {
-                isTransitioningRef.current = false;
-                setPlayStatus(true);
-                showToast(`Now playing: ${song.name}`, "success");
-                // Socket emit is handled exclusively by el.onplay (audio element callback)
-              })
-              .catch((error) => {
-                isTransitioningRef.current = false;
-                console.error("Play error:", error);
-                showToast("Failed to play song. Please try again.", "error");
-                setPlayStatus(false);
-              });
-          };
-
-          const handleError = () => {
-            isTransitioningRef.current = false;
-            audioRef.current.removeEventListener("error", handleError);
-            console.error("Audio load error for:", song.file);
-            showToast("Failed to load song. Please try another song.", "error");
-            setPlayStatus(false);
-          };
-
-          audioRef.current.addEventListener("canplay", handleCanPlay);
-          audioRef.current.addEventListener("error", handleError);
-
-          // Fallback timeout — use ref to read live playStatus, not the stale closure value
-          setTimeout(() => {
-            if (!playStatusRef.current) {
-              audioRef.current.removeEventListener("canplay", handleCanPlay);
-              audioRef.current.removeEventListener("error", handleError);
-              showToast(
-                "Song is taking too long to load. Please try again.",
-                "error",
-              );
-            }
-          }, 10000);
-        }
       } catch (error) {
         console.error("Error in playWithId:", error);
         showToast("Failed to play song", "error");
