@@ -24,7 +24,7 @@ Sign up, log in, browse albums, play audio with a global player, like songs, bui
 JWT-protected dashboard: add/delete songs and albums (Cloudinary uploads), charts (aggregations), live-ish activity feed, loop-diagnosis stats.
 
 **API (`server/`)**  
-REST under `/api/*`, Socket.io for listener counts and realtime fan-out, optional Redis for caching and loop-session state with in-memory fallback, Cloudinary for media, bcrypt + JWT for users and admin role checks.
+30+ REST endpoints under `/api/*` with JWT auth, RBAC, Helmet.js security headers, and rate limiting. Socket.io for listener counts and realtime fan-out, optional Redis for caching and loop-session state with in-memory fallback, Cloudinary for media.
 
 ---
 
@@ -39,8 +39,9 @@ REST under `/api/*`, Socket.io for listener counts and realtime fan-out, optiona
 | Cache | Redis (optional) | Song/listener caching; code paths tolerate Redis being off |
 | Realtime | Socket.io | Listener counts + admin events on default namespace; /loopDiagnosis for interventions |
 | Media | Cloudinary | Hosted audio + art |
-| Auth | JWT + bcrypt | Stateless API auth; admin routes gated by role |
-| Ranking / AI | Embeddings `.npy`, heuristics, LLM intent parsing | Recommendations + playlist intent without inventing songs |
+| Auth | JWT + bcrypt, RBAC | Stateless API auth; admin routes gated by role |
+| Security | Helmet.js, express-rate-limit | HTTP security headers; configurable `/api` rate limiting (on in production) |
+| Ranking / AI | Collaborative filtering, optional `.npy` embedding hybrid, LLM intent parsing | CF for the main feed; precomputed user/item vectors for `/api/ai` when embeddings are present; LLM parses playlist intent without inventing songs |
 
 ---
 
@@ -50,6 +51,7 @@ REST under `/api/*`, Socket.io for listener counts and realtime fan-out, optiona
 |--------|--------|
 | Frontends | 2 separate React apps (listener + admin) |
 | API endpoints | 30+ REST routes across auth, songs, albums, playlists, AI, loop-diagnosis |
+| API security | Helmet.js headers + configurable `/api` rate limiting (enabled in production) |
 | Real-time | Socket.io default namespace + /loopDiagnosis; admin updates via rooms |
 | Auth system | JWT + bcrypt, role-based (user vs admin), multi-tab sync |
 | AI feature | LLM intent parser → MongoDB query → ranked results (no hallucinated songs) |
@@ -205,9 +207,11 @@ When `LLM_PROVIDER=openrouter`, the backend hits the OpenRouter Chat Completions
 
 ### Recommendations
 
-Authenticated recommendation UI is driven by `GET /api/recommendations/cf/:userId`. The collaborative-filtering service builds a weighted identity profile from likes and recently played songs, reinforces dominant language/taste clusters, and only uses trending fallback when CF candidates are insufficient.
+Authenticated recommendation UI is driven by `GET /api/recommendations/cf/:userId`. The collaborative-filtering service builds a weighted taste profile from likes and recently played songs, reinforces dominant language/taste clusters, and only uses trending fallback when CF candidates are insufficient.
 
 The older authenticated `/api/song/recommendations` route is kept backward compatible by routing to the same CF service. Likes, unlikes, and recently played updates invalidate both legacy recommendation cache keys and versioned CF cache keys, so recommendation identity updates immediately after playback or feedback.
+
+**Optional embedding layer (`/api/ai`)** — Offline-exported interaction data (`data/data.json`) can be turned into `user_emb.npy` / `item_emb.npy` via `server/scripts/generate-embeddings.mjs`. At runtime, `embeddingRecommender.js` loads those float32 matrices and ranks songs by cosine similarity, then blends in short-term feedback (likes/skips/plays) and adaptive profiles retrained from live signals. If the `.npy` files are missing, the AI route falls back to the same heuristics/CF paths so the API still responds.
 
 ---
 
