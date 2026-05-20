@@ -53,6 +53,8 @@ REST under `/api/*`, Socket.io for listener counts and realtime fan-out, optiona
 | Real-time | Socket.io default namespace + /loopDiagnosis; admin updates via rooms |
 | Auth system | JWT + bcrypt, role-based (user vs admin), multi-tab sync |
 | AI feature | LLM intent parser → MongoDB query → ranked results (no hallucinated songs) |
+| Recommendation engine | Collaborative filtering — weighted taste profile, versioned cache keys, CF fallback for cold-start users |
+| Loop-detection system | Separate /loopDiagnosis Socket.IO namespace, Redis-backed session counters, admin diagnosis panel |
 | Wellbeing system | Loop-detection that nudges users when same song repeats excessively |
 | Test coverage | Server unit tests + loop-diagnosis suite + client/admin CI builds |
 
@@ -227,6 +229,10 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
 - **Play count spam:** solved with a short server-side dedupe window and guarding concurrent play handlers so double-clicks do not inflate counts.
 - **Context re-renders in the player:** keeping heavy playback state out of React context fields that change every frame took a few iterations; the write-up in `docs/FINAL_PROJECT_GUIDE.md` calls out the approach.
 - **Redis present but not guaranteed:** every feature that likes Redis has a boring fallback so `npm run server` still works on a laptop without Docker.
+- **Recommendation cold start:** New users have no history so CF returns no
+   candidates. Solved with a trending-based fallback that activates only when CF
+   candidates fall below a minimum threshold, then phases out as the user builds
+   a taste profile.
 - **Windows + Node’s test runner:** passing a directory to `node --test` was flaky here, so the server uses `scripts/run-node-tests.mjs` to expand test files explicitly—same behavior on Linux CI.
 
 ---
@@ -241,9 +247,11 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
 
 ## Future work
 
-- Proper E2E (Playwright) for auth + play + admin upload.
-- Stricter httpOnly cookie session option instead of `localStorage` tokens.
-- Typed OpenAPI spec generated from routes for frontend clients.
+- E2E tests with Playwright covering auth, play, admin upload, and full recommendation flow
+- httpOnly cookie sessions instead of localStorage JWT — reduces XSS attack surface
+- Typed OpenAPI spec generated from routes for frontend type safety
+- Offline playback queue using Service Workers
+- Proper pagination on the recommendations feed for large song libraries
 
 ---
 
