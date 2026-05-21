@@ -226,6 +226,9 @@ cd admin && npm run ci
 
 GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-severity audit, client and admin lint/build/audit, then `npm run build:client` to prove the SPA copy step works.
 
+- Approximate test count: server unit tests + loop-diagnosis suite 
+- (~30+ assertions); CI runs on every push/PR.
+
 ---
 
 ## Challenges (honest)
