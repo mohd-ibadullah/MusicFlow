@@ -41,7 +41,7 @@ JWT-protected dashboard: add/delete songs and albums (Cloudinary uploads), chart
 | Media | Cloudinary | Hosted audio + art |
 | Auth | JWT + bcrypt, RBAC | Stateless API auth; admin routes gated by role |
 | Security | Helmet.js, express-rate-limit | HTTP security headers; configurable `/api` rate limiting (on in production) |
-| Ranking / AI | Collaborative filtering, optional `.npy` embedding hybrid, LLM intent parsing | CF for the main feed; precomputed user/item vectors for `/api/ai` when embeddings are present; LLM parses playlist intent without inventing songs |
+| Ranking / AI | Collaborative filtering, experimental `.npy` embedding hybrid (not shipped — .npy/.pth are gitignored, generate locally), LLM intent parsing | CF for the main feed; precomputed user/item vectors for `/api/ai` when embeddings are present; LLM parses playlist intent without inventing songs |
 
 ---
 
