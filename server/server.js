@@ -207,6 +207,13 @@ app.get("/api/realtime/diagnostics", authenticateToken, authorizeAdmin, (req, re
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed' || (err instanceof SyntaxError && err.status === 400 && 'body' in err)) {
+    return res.status(400).json({ success: false, message: 'Malformed JSON in request body' });
+  }
+  next(err);
+});
+
+app.use((err, req, res, next) => {
   logger.error("Server error", { error: err?.message || String(err) });
   res.status(500).json({
     success: false,
