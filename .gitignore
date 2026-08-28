@@ -65,3 +65,7 @@ coverage/
 # AI runtime state (live user embeddings — never commit)
 server/src/ai/runtime/
 
+# Removed broken gitlink
+musicflow-backend-space/
+server/src/ai/runtime/
+
