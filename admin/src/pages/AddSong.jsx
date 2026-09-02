@@ -67,7 +67,7 @@ const AddSong = () => {
 
     setLoading(true);
     setUploadProgress(0);
-    setUploadStage("Preparing files…");
+    setUploadStage("Preparing files...");
 
     try {
       const token = localStorage.getItem("auth_token");
@@ -80,7 +80,7 @@ const AddSong = () => {
       formData.append("artist", artist.trim());
       formData.append("language", language);
 
-      setUploadStage("Uploading…");
+      setUploadStage("Uploading...");
       setUploadProgress(20);
 
       const response = await axios.post(`${url}/api/song/add`, formData, {
@@ -93,7 +93,7 @@ const AddSong = () => {
         timeout: 120000,
       });
 
-      setUploadStage("Processing…");
+      setUploadStage("Processing...");
       setUploadProgress(90);
       await new Promise((resolve) => setTimeout(resolve, 1500));
       setUploadProgress(100);
@@ -173,7 +173,7 @@ const AddSong = () => {
                   {song.name} ({(song.size / (1024 * 1024)).toFixed(1)} MB)
                 </p>
               )}
-              <p className="text-xs text-gray-500">MP3, WAV, FLAC, AAC, OGG · Max 50 MB</p>
+              <p className="text-xs text-gray-500">MP3, WAV, FLAC, AAC, OGG | Max 50 MB</p>
             </div>
 
             <div className="space-y-2">
@@ -197,7 +197,7 @@ const AddSong = () => {
                   {image.name} ({(image.size / (1024 * 1024)).toFixed(1)} MB)
                 </p>
               )}
-              <p className="text-xs text-gray-500">JPEG, PNG, WebP · Max 5 MB</p>
+              <p className="text-xs text-gray-500">JPEG, PNG, WebP | Max 5 MB</p>
             </div>
           </div>
 

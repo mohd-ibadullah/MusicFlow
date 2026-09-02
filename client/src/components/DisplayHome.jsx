@@ -44,10 +44,10 @@ const DisplayHome = () => {
 
   // Format last played date
   const formatLastPlayed = (dateString) => {
-    if (!dateString) return "—";
+    if (!dateString) return " -- ";
 
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "—";
+    if (isNaN(date.getTime())) return " -- ";
 
     const now = new Date();
     const diffInMs = now - date;
@@ -347,7 +347,7 @@ const DisplayHome = () => {
           </span>
           {liveListening.slice(0, 5).map((item, i) => (
             <span key={i} className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
-              {item.userName || "Someone"} · {item.songName || "—"}
+              {item.userName || "Someone"} | {item.songName || " -- "}
             </span>
           ))}
         </section>

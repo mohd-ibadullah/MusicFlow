@@ -35,7 +35,7 @@ const AddAlbum = () => {
 
     setLoading(true);
     setUploadProgress(0);
-    setUploadStage("Uploading cover…");
+    setUploadStage("Uploading cover...");
 
     try {
       const token = localStorage.getItem("auth_token");
@@ -54,7 +54,7 @@ const AddAlbum = () => {
         },
       });
 
-      setUploadStage("Finalizing…");
+      setUploadStage("Finalizing...");
       setUploadProgress(100);
 
       if (response.data.success) {
@@ -121,7 +121,7 @@ const AddAlbum = () => {
                   {image.name}
                 </p>
               )}
-              <p className="text-xs text-gray-500">JPEG, PNG, WebP · Max 5 MB</p>
+              <p className="text-xs text-gray-500">JPEG, PNG, WebP | Max 5 MB</p>
             </div>
 
             {/* Fields */}

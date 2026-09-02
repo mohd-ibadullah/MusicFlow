@@ -1,6 +1,6 @@
 /**
  * Migration: Assign language from album.
- * Hindi Songs → Hindi, English Songs → English, Telugu Songs → Telugu
+ * Hindi Songs -> Hindi, English Songs -> English, Telugu Songs -> Telugu
  * Run: node scripts/fixLanguages.js (from server directory)
  */
 import dotenv from "dotenv";

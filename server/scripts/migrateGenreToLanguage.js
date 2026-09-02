@@ -29,7 +29,7 @@ async function run() {
   await mongoose.connect(uri);
 
   const songs = await Song.find({}).lean();
-  console.log(`\n📊 Found ${songs.length} songs. Migrating genre → language...\n`);
+  console.log(`\n📊 Found ${songs.length} songs. Migrating genre -> language...\n`);
 
   const report = { scanned: songs.length, updated: 0, languageAssigned: new Set(), genreRemoved: 0 };
 
@@ -51,7 +51,7 @@ async function run() {
   }
 
   console.log("═══════════════════════════════════════════════════════");
-  console.log("     GENRE → LANGUAGE MIGRATION REPORT");
+  console.log("     GENRE -> LANGUAGE MIGRATION REPORT");
   console.log("═══════════════════════════════════════════════════════");
   console.log("Songs scanned:", report.scanned);
   console.log("Songs updated:", report.updated);
@@ -60,7 +60,7 @@ async function run() {
   console.log("═══════════════════════════════════════════════════════\n");
 
   await mongoose.disconnect();
-  console.log("✅ Migration complete.");
+  console.log("[OK] Migration complete.");
 }
 
 run().catch((err) => {

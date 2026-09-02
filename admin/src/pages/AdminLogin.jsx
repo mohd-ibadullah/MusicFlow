@@ -77,7 +77,7 @@ const AdminLogin = () => {
               <input
                 type="password"
                 className="input-admin"
-                placeholder="••••••••"
+                placeholder="********"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

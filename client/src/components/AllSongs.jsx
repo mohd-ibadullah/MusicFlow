@@ -35,7 +35,7 @@ const AllSongs = () => {
   const durationOptions = [
     { value: "all", label: "All lengths" },
     { value: "short", label: "Short (<3m)" },
-    { value: "medium", label: "Medium (3–5m)" },
+    { value: "medium", label: "Medium (3-5m)" },
     { value: "long", label: "Long (>5m)" }
   ];
 
@@ -48,8 +48,8 @@ const AllSongs = () => {
   const sortOptions = [
     { value: "newest", label: "Newest first" },
     { value: "oldest", label: "Oldest first" },
-    { value: "name", label: "Name A–Z" },
-    { value: "album", label: "Album A–Z" },
+    { value: "name", label: "Name A-Z" },
+    { value: "album", label: "Album A-Z" },
     { value: "popular", label: "Most popular" }
   ];
 

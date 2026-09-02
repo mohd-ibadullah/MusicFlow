@@ -30,7 +30,7 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // ✅ Add user info to request (with role from token fallback)
+    // [OK] Add user info to request (with role from token fallback)
     req.user = {
       userId: user._id,
       email: user.email,
@@ -74,7 +74,7 @@ const authorizeAdmin = async (req, res, next) => {
         message: 'Authentication required',
       });
     }
-    // ✅ Use role check safely
+    // [OK] Use role check safely
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,

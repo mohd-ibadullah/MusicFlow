@@ -9,7 +9,7 @@ export default defineConfig({
     allowedHosts: true,
     open: false,
     proxy: {
-      // Use 127.0.0.1 so the dev proxy does not depend on localhost → ::1 vs IPv4 resolution (common on Windows).
+      // Use 127.0.0.1 so the dev proxy does not depend on localhost -> ::1 vs IPv4 resolution (common on Windows).
       '/api': {
         target: 'http://127.0.0.1:4002',
         changeOrigin: true,

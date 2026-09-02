@@ -467,7 +467,7 @@ const AdminAnalytics = () => {
       <div className="grid place-items-center min-h-[60vh] animate-fade-in">
         <div className="text-center">
           <div className="w-10 h-10 border-[3px] border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-sm text-gray-500">Loading analytics…</p>
+          <p className="text-sm text-gray-500">Loading analytics...</p>
         </div>
       </div>
     );

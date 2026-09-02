@@ -88,7 +88,7 @@ async function run() {
 
     await Song.updateOne({ _id: song._id }, { $set: { artist } });
     updated++;
-    console.log(`  ${song.name} → ${artist}`);
+    console.log(`  ${song.name} -> ${artist}`);
   }
 
   console.log("\n═══════════════════════════════════════");
