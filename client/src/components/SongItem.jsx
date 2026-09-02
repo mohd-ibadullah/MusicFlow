@@ -39,7 +39,7 @@ const SongItem = ({ image, name, desc, artist, language, id, duration, album, pl
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
 
   // Validate and fallback song data
-  const artistLanguage = [artist, language].filter(Boolean).join(" * ") || " -- ";
+  const artistLanguage = [artist, language].filter(Boolean).join(" * ") || "-";
 
   const safeValues = useMemo(() => ({
     image: image && typeof image === "string" ? image : "https://images.unsplash.com/photo-1494232410401-ad00d5433cfa?w=300&h=300&fit=crop&crop=center",

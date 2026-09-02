@@ -125,7 +125,7 @@ const Sidebar = () => {
           </div>
         </div>
 
-        {/* Create Playlist Card  --  only when expanded and no playlists */}
+        {/* Create Playlist Card, only when expanded and no playlists */}
         {!isCollapsed && playlists.length === 0 && (
           <div className="p-4">
             <div className="rounded-xl p-6 shadow-md border border-blue-400/20 dark:border-blue-700/30 bg-gradient-to-b from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700">

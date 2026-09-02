@@ -438,7 +438,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// Start server on the configured port  --  bind 0.0.0.0 so IPv4 dev tools (e.g. Vite proxy to 127.0.0.1) always reach us.
+// Start server on the configured port, bind 0.0.0.0 so IPv4 dev tools (e.g. Vite proxy to 127.0.0.1) always reach us.
 server.listen(port, "0.0.0.0", () => {
   logger.info(`Server listening on port ${port}`);
 });

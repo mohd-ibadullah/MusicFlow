@@ -130,11 +130,11 @@ const ListSong = () => {
   );
 
   const formatDate = (dateString) => {
-    if (!dateString) return " -- ";
+    if (!dateString) return "-";
     try {
       const date = new Date(dateString);
-      return isNaN(date.getTime()) ? " -- " : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    } catch { return " -- "; }
+      return isNaN(date.getTime()) ? "-" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch { return "-"; }
   };
 
   useEffect(() => { fetchSongs(); }, []);
@@ -281,7 +281,7 @@ const ListSong = () => {
                   <span className="text-sm text-gray-600">{item.album || "Single"}</span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-sm text-gray-600">{item.artist || " -- "}</span>
+                  <span className="text-sm text-gray-600">{item.artist || "-"}</span>
                 </div>
                 <div className="col-span-1">
                   <span className="badge-blue">{item.duration || "0:00"}</span>

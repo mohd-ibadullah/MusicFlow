@@ -130,11 +130,11 @@ const ListAlbum = () => {
   );
 
   const formatDate = (dateString) => {
-    if (!dateString) return " -- ";
+    if (!dateString) return "-";
     try {
       const date = new Date(dateString);
-      return isNaN(date.getTime()) ? " -- " : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    } catch { return " -- "; }
+      return isNaN(date.getTime()) ? "-" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch { return "-"; }
   };
 
   useEffect(() => { fetchAlbums(); }, []);

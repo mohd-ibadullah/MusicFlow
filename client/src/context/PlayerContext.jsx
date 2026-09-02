@@ -456,7 +456,7 @@ const PlayerContextProvider = (props) => {
   }, []);
 
   const emitStoppedListening = useCallback(() => {
-    // Don't emit during song transitions  --  the brief pause between songs is internal
+    // Don't emit during song transitions, the brief pause between songs is internal
     if (isTransitioningRef.current) return;
 
     const sock = socketRef.current;
