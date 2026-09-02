@@ -61,11 +61,11 @@ export const AuthProvider = ({ children }) => {
 
       if (!e.newValue) {
         window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
-        // Token was removed in another tab → log out here too
+        // Token was removed in another tab -> log out here too
         delete axios.defaults.headers.common['Authorization'];
         setUser(null);
       } else {
-        // Token was set in another tab → verify and sync
+        // Token was set in another tab -> verify and sync
         axios.defaults.headers.common['Authorization'] = `Bearer ${e.newValue}`;
         try {
           const response = await axios.get(`${API_BASE_URL}/api/auth/profile`);

@@ -5,20 +5,20 @@
 [![Express 5](https://img.shields.io/badge/Express-5-lightgrey)](https://expressjs.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248)](https://www.mongodb.com/)
 
-Full-stack music web app: React listener client, separate React admin panel, and an Express API with Socket.io, optional Redis, and MongoDB. A production-style music streaming app built from scratch — real-time listener counts via Socket.io, AI playlist generation, a loop-detection wellbeing system, and a full admin panel with live analytics. Built to understand how streaming products actually work under the hood.
+Full-stack music web app: React listener client, separate React admin panel, and an Express API with Socket.io, optional Redis, and MongoDB. A production-style music streaming app built from scratch  --  real-time listener counts via Socket.io, AI playlist generation, a loop-detection wellbeing system, and a full admin panel with live analytics. Built to understand how streaming products actually work under the hood.
 
 ---
 
 ## The problem I cared about
 
-Playlist apps are easy to mock in a UI. They are harder to get right when play counts matter, many tabs are open, admins need honest analytics, and you still want recommendations that do not hallucinate tracks that do not exist in your database. This repo is my answer: one API that serves two frontends, keeps counts consistent, and separates “LLM help” from “data the app actually owns.”
+Playlist apps are easy to mock in a UI. They are harder to get right when play counts matter, many tabs are open, admins need honest analytics, and you still want recommendations that do not hallucinate tracks that do not exist in your database. This repo is my answer: one API that serves two frontends, keeps counts consistent, and separates "LLM help" from "data the app actually owns."
 
 ---
 
 ## What it does (for real)
 
 **Listener (`client/`)**  
-Sign up, log in, browse albums, play audio with a global player, like songs, build playlists, run an AI playlist generator (prompt in → query and rank from Mongo only), see recommendations plus a collaborative-filtering "People Also Listen To" feed, search the library, and—if enabled—get loop-detection nudges when the same song repeats a lot.
+Sign up, log in, browse albums, play audio with a global player, like songs, build playlists, run an AI playlist generator (prompt in -> query and rank from Mongo only), see recommendations plus a collaborative-filtering "People Also Listen To" feed, search the library, and -- if enabled -- get loop-detection nudges when the same song repeats a lot.
 
 **Admin (`admin/`)**  
 JWT-protected dashboard: add/delete songs and albums (Cloudinary uploads), charts (aggregations), live-ish activity feed, loop-diagnosis stats.
@@ -41,11 +41,11 @@ JWT-protected dashboard: add/delete songs and albums (Cloudinary uploads), chart
 | Media | Cloudinary | Hosted audio + art |
 | Auth | JWT + bcrypt, RBAC | Stateless API auth; admin routes gated by role |
 | Security | Helmet.js, express-rate-limit | HTTP security headers; configurable `/api` rate limiting (on in production) |
-| Ranking / AI | Collaborative filtering, experimental `.npy` embedding hybrid (not shipped — .npy/.pth are gitignored, generate locally), LLM intent parsing | CF for the main feed; precomputed user/item vectors for `/api/ai` when embeddings are present; LLM parses playlist intent without inventing songs |
+| Ranking / AI | Collaborative filtering, experimental `.npy` embedding hybrid (not shipped  --  .npy/.pth are gitignored, generate locally), LLM intent parsing | CF for the main feed; precomputed user/item vectors for `/api/ai` when embeddings are present; LLM parses playlist intent without inventing songs |
 
 ---
 
-## What I Built — By The Numbers
+## What I Built  --  By The Numbers
 
 | Metric | Detail |
 |--------|--------|
@@ -54,8 +54,8 @@ JWT-protected dashboard: add/delete songs and albums (Cloudinary uploads), chart
 | API security | Helmet.js headers + configurable `/api` rate limiting (enabled in production) |
 | Real-time | Socket.io default namespace + /loopDiagnosis; admin updates via rooms |
 | Auth system | JWT + bcrypt, role-based (user vs admin), multi-tab sync |
-| AI feature | LLM intent parser → MongoDB query → ranked results (no hallucinated songs) |
-| Recommendation engine | Collaborative filtering — weighted taste profile, versioned cache keys, CF fallback for cold-start users |
+| AI feature | LLM intent parser -> MongoDB query -> ranked results (no hallucinated songs) |
+| Recommendation engine | Collaborative filtering  --  weighted taste profile, versioned cache keys, CF fallback for cold-start users |
 | Loop-detection system | Separate /loopDiagnosis Socket.IO namespace, Redis-backed session counters, admin diagnosis panel |
 | Wellbeing system | Loop-detection that nudges users when same song repeats excessively |
 | Test coverage | Server unit tests + loop-diagnosis suite + client/admin CI builds |
@@ -197,11 +197,11 @@ When enabled, Redis backs cache helpers and loop-diagnosis counters/session keys
 
 ### Socket.io
 
-Used for live listener counts, pushing recent listening events, admin activity, and the `/loopDiagnosis` namespace for wellbeing-style interventions. The server deduplicates socket ↔ user mappings and can mirror “who is listening” in Redis when available.
+Used for live listener counts, pushing recent listening events, admin activity, and the `/loopDiagnosis` namespace for wellbeing-style interventions. The server deduplicates socket ↔ user mappings and can mirror "who is listening" in Redis when available.
 
 Playback sessions are explicitly cleaned up on logout, token removal in another tab, socket disconnect, and song stop events. The client does not restore a global `currentTrack` from localStorage, so a later login or a different account cannot inherit stale playback state. The realtime server tracks active playback by socket and session and exposes admin-protected `GET /api/realtime/diagnostics` for development-time inspection.
 
-**LLM usage (playlists)** — `POST /api/playlist/generate` uses OpenRouter to interpret prompt intent and always pulls song IDs from MongoDB (never LLM output).
+**LLM usage (playlists)**  --  `POST /api/playlist/generate` uses OpenRouter to interpret prompt intent and always pulls song IDs from MongoDB (never LLM output).
 
 When `LLM_PROVIDER=openrouter`, the backend hits the OpenRouter Chat Completions API at `https://openrouter.ai/api/v1`.
 
@@ -211,7 +211,7 @@ Authenticated recommendation UI is driven by `GET /api/recommendations/cf/:userI
 
 The older authenticated `/api/song/recommendations` route is kept backward compatible by routing to the same CF service. Likes, unlikes, and recently played updates invalidate both legacy recommendation cache keys and versioned CF cache keys, so recommendation identity updates immediately after playback or feedback.
 
-**Optional embedding layer (`/api/ai`)** — Offline-exported interaction data (`data/data.json`) can be turned into `user_emb.npy` / `item_emb.npy` via `server/scripts/generate-embeddings.mjs`. At runtime, `embeddingRecommender.js` loads those float32 matrices and ranks songs by cosine similarity, then blends in short-term feedback (likes/skips/plays) and adaptive profiles retrained from live signals. If the `.npy` files are missing, the AI route falls back to the same heuristics/CF paths so the API still responds.
+**Optional embedding layer (`/api/ai`)**  --  Offline-exported interaction data (`data/data.json`) can be turned into `user_emb.npy` / `item_emb.npy` via `server/scripts/generate-embeddings.mjs`. At runtime, `embeddingRecommender.js` loads those float32 matrices and ranks songs by cosine similarity, then blends in short-term feedback (likes/skips/plays) and adaptive profiles retrained from live signals. If the `.npy` files are missing, the AI route falls back to the same heuristics/CF paths so the API still responds.
 
 ---
 
@@ -240,7 +240,7 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
    candidates. Solved with a trending-based fallback that activates only when CF
    candidates fall below a minimum threshold, then phases out as the user builds
    a taste profile.
-- **Windows + Node’s test runner:** passing a directory to `node --test` was flaky here, so the server uses `scripts/run-node-tests.mjs` to expand test files explicitly—same behavior on Linux CI.
+- **Windows + Node's test runner:** passing a directory to `node --test` was flaky here, so the server uses `scripts/run-node-tests.mjs` to expand test files explicitly -- same behavior on Linux CI.
 
 ---
 
@@ -255,7 +255,7 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
 ## Future work
 
 - E2E tests with Playwright covering auth, play, admin upload, and full recommendation flow
-- httpOnly cookie sessions instead of localStorage JWT — reduces XSS attack surface
+- httpOnly cookie sessions instead of localStorage JWT  --  reduces XSS attack surface
 - Typed OpenAPI spec generated from routes for frontend type safety
 - Offline playback queue using Service Workers
 - Proper pagination on the recommendations feed for large song libraries
@@ -264,7 +264,7 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
 
 ## Author
 
-Maintained by **MOHD IBADULLAH** · [GitHub Profile](https://github.com/mohd-ibadullah) · [LinkedIn](https://www.linkedin.com/in/mohd-ibadullah-4786b640a/)
+Maintained by **MOHD IBADULLAH** | [GitHub Profile](https://github.com/mohd-ibadullah) | [LinkedIn](https://www.linkedin.com/in/mohd-ibadullah-4786b640a/)
 
 ---
 

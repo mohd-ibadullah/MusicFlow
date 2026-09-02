@@ -130,11 +130,11 @@ const ListSong = () => {
   );
 
   const formatDate = (dateString) => {
-    if (!dateString) return "—";
+    if (!dateString) return " -- ";
     try {
       const date = new Date(dateString);
-      return isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    } catch { return "—"; }
+      return isNaN(date.getTime()) ? " -- " : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch { return " -- "; }
   };
 
   useEffect(() => { fetchSongs(); }, []);
@@ -200,7 +200,7 @@ const ListSong = () => {
       <div className="grid place-items-center min-h-[60vh] animate-fade-in">
         <div className="text-center">
           <div className="w-10 h-10 border-[3px] border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-sm text-gray-500">Loading songs…</p>
+          <p className="text-sm text-gray-500">Loading songs...</p>
         </div>
       </div>
     );
@@ -222,7 +222,7 @@ const ListSong = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search…"
+              placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="input-admin pl-9 !w-48 sm:!w-56"
@@ -281,7 +281,7 @@ const ListSong = () => {
                   <span className="text-sm text-gray-600">{item.album || "Single"}</span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-sm text-gray-600">{item.artist || "—"}</span>
+                  <span className="text-sm text-gray-600">{item.artist || " -- "}</span>
                 </div>
                 <div className="col-span-1">
                   <span className="badge-blue">{item.duration || "0:00"}</span>

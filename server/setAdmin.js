@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import User from "./src/models/userModel.js"; // ✅ make sure this path exists
+import User from "./src/models/userModel.js"; // [OK] make sure this path exists
 
 // Load environment variables from .env file
 dotenv.config();
@@ -28,11 +28,11 @@ const setAdmin = async () => {
       process.exit(1);
     }
 
-    // ✅ Correct field based on your MongoDB document
+    // [OK] Correct field based on your MongoDB document
     user.role = "admin";
     await user.save();
 
-    console.log(`✅ ${email} is now an admin!`);
+    console.log(`[OK] ${email} is now an admin!`);
   } catch (error) {
     console.error("❌ Error setting admin role:", error);
   } finally {

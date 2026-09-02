@@ -29,7 +29,7 @@ class ErrorBoundary extends React.Component {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center">
             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center text-2xl mx-auto mb-4">
-              ⚠️
+              (!)
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
               Something went wrong

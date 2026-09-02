@@ -36,7 +36,7 @@ const addAlbum = async (req, res) => {
       try {
         fs.unlinkSync(req.file.path);
       } catch (cleanupError) {
-        console.warn("⚠️ Could not clean up temp file:", cleanupError.message);
+        console.warn("(!) Could not clean up temp file:", cleanupError.message);
       }
 
       return res.status(400).json({
@@ -72,7 +72,7 @@ const addAlbum = async (req, res) => {
       try {
         fs.unlinkSync(imageFile);
       } catch (cleanupError) {
-        console.warn("⚠️ Could not clean up temp file:", cleanupError.message);
+        console.warn("(!) Could not clean up temp file:", cleanupError.message);
       }
 
       res.status(200).json({

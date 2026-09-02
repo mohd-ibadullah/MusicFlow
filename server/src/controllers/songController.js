@@ -177,14 +177,14 @@ export const addSong = async (req, res) => {
     try {
       const stats = fs.statSync(audioFile);
       const fileSizeInMB = stats.size / (1024 * 1024);
-      // Rough estimate: 1MB ≈ 1 minute for MP3
+      // Rough estimate: 1MB ~ 1 minute for MP3
       const estimatedMinutes = Math.max(1, Math.round(fileSizeInMB));
       const estimatedSeconds = Math.round(
         (fileSizeInMB - Math.floor(fileSizeInMB)) * 60,
       );
       duration = `${estimatedMinutes}:${estimatedSeconds.toString().padStart(2, "0")}`;
     } catch (durationError) {
-      console.warn("⚠️ Could not estimate duration:", durationError.message);
+      console.warn("(!) Could not estimate duration:", durationError.message);
     }
 
     const songData = {

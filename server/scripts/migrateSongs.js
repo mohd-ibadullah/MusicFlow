@@ -173,8 +173,8 @@ async function run() {
   console.log("───────────────────────────────────────────────────────");
   const artistsList = [...report.artistsAssigned].filter((a) => a && !a.toLowerCase().includes("unknown")).sort();
   const genresList = [...report.genresAssigned].filter((g) => g && !g.toLowerCase().includes("unknown")).sort();
-  console.log("Artists assigned:", artistsList.length ? artistsList.join(", ") : "—");
-  console.log("Genres assigned:", genresList.length ? genresList.join(", ") : "—");
+  console.log("Artists assigned:", artistsList.length ? artistsList.join(", ") : " -- ");
+  console.log("Genres assigned:", genresList.length ? genresList.join(", ") : " -- ");
   console.log("───────────────────────────────────────────────────────");
   if (report.details.length > 0) {
     console.log("Updated songs:");
@@ -182,13 +182,13 @@ async function run() {
       const parts = [];
       if (d.artist) parts.push(`artist: ${d.artist}`);
       if (d.genre) parts.push(`genre: ${d.genre}`);
-      console.log(`  - ${d.name} → ${parts.join(", ")}`);
+      console.log(`  - ${d.name} -> ${parts.join(", ")}`);
     });
   }
   console.log("═══════════════════════════════════════════════════════\n");
 
   await mongoose.disconnect();
-  console.log("✅ Migration complete. Disconnected.");
+  console.log("[OK] Migration complete. Disconnected.");
 }
 
 run().catch((err) => {

@@ -121,7 +121,7 @@ const DisplayAlbum = ({ album }) => {
               </div>
               <span className="text-sm font-medium">MusicFlow</span>
             </div>
-            <span className="text-gray-500 dark:text-gray-400">•</span>
+            <span className="text-gray-500 dark:text-gray-400">*</span>
             <span className="text-gray-500 dark:text-gray-400 text-sm">
               {albumSongs.length} {albumSongs.length === 1 ? 'song' : 'songs'}
             </span>

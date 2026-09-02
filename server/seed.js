@@ -45,7 +45,7 @@ async function seed() {
   const songs = await Song.insertMany(sampleSongs);
   const albums = await Album.insertMany(sampleAlbums);
 
-  console.log(`✅ Inserted ${songs.length} songs and ${albums.length} albums.`);
+  console.log(`[OK] Inserted ${songs.length} songs and ${albums.length} albums.`);
   process.exit(0);
 }
 

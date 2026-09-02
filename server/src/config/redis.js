@@ -13,7 +13,7 @@ const getRedisUrl = () => {
     const password = process.env.REDIS_PASSWORD ? `:${process.env.REDIS_PASSWORD}@` : "";
     return `redis://${password}${process.env.REDIS_HOST}:${port}`;
   }
-  // default is not returned automatically; caller will short‑circuit
+  // default is not returned automatically; caller will short-circuit
   return null;
 };
 

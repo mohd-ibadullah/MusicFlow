@@ -117,7 +117,7 @@ async function run() {
 
     if (Object.keys(updates).length > 0) {
       await Song.updateOne({ _id: song._id }, { $set: updates });
-      console.log(`  ${song.name} → artist: ${updates.artist || song.artist}, language: ${updates.language || song.language}`);
+      console.log(`  ${song.name} -> artist: ${updates.artist || song.artist}, language: ${updates.language || song.language}`);
     }
   }
 
