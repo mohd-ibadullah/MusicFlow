@@ -1,9 +1,14 @@
 # MusicFlow
 🚀 **Live Demo:** [music-flow-vqmp.vercel.app](https://music-flow-vqmp.vercel.app)
+> **Deployed:** Vercel (frontend) | Hugging Face Space (Express API + Socket.io) | MongoDB Atlas
+
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 [![Node.js 20+](https://img.shields.io/badge/node.js-%3E%3D20-darkgreen)](https://nodejs.org/)
 [![Express 5](https://img.shields.io/badge/Express-5-lightgrey)](https://expressjs.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248)](https://www.mongodb.com/)
+[![CI](https://github.com/mohd-ibadullah/MusicFlow/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/mohd-ibadullah/MusicFlow/actions)
+
+![MusicFlow client home](screenshots/client-home.png)
 
 Full-stack music web app: React listener client, separate React admin panel, and an Express API with Socket.io, optional Redis, and MongoDB. A production-style music streaming app built from scratch, real-time listener counts via Socket.io, AI playlist generation, a loop-detection wellbeing system, and a full admin panel with live analytics. Built to understand how streaming products actually work under the hood.
 
