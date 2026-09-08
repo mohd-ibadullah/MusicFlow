@@ -1,5 +1,5 @@
 # MusicFlow
-🚀 **Live Demo:** [music-flow-vqmp.vercel.app](https://music-flow-vqmp.vercel.app)
+**Live Demo:** [music-flow-vqmp.vercel.app](https://music-flow-vqmp.vercel.app)
 > **Deployed:** Vercel (frontend) | Hugging Face Space (Express API + Socket.io) | MongoDB Atlas
 
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
