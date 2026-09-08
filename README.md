@@ -114,7 +114,7 @@ MusicFlow/
 
 ![Full system architecture](docs/architecture.png)
 
-Deep dive (routes, models, edge cases, interview notes): [docs/FINAL_PROJECT_GUIDE.md](docs/FINAL_PROJECT_GUIDE.md).
+Deep dive (routes, models, edge cases, design notes): [docs/FINAL_PROJECT_GUIDE.md](docs/FINAL_PROJECT_GUIDE.md).
 
 ---
 
