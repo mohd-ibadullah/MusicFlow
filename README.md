@@ -77,7 +77,6 @@ MusicFlow/
 ├── docs/                   # Long-form technical write-up
 │   └── FINAL_PROJECT_GUIDE.md
 ├── data/                   # Optional interaction export for embedding pipeline (`data/data.json`)
-├── tests/                  # Placeholder for future cross-package tests (API tests live in `server/tests/`)
 ├── screenshots/            # Drop UI captures here for your portfolio README previews
 ├── scripts/                # Repo-level helpers (loop sim, hooks, etc.)
 ├── .github/workflows/      # CI: tests + lint + build + audits
