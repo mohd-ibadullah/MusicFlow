@@ -268,7 +268,7 @@ GitHub Actions (`.github/workflows/quality-gates.yml`): server tests + high-seve
 
 ## Author
 
-Maintained by **MOHD IBADULLAH** | [GitHub Profile](https://github.com/mohd-ibadullah) | [LinkedIn](https://www.linkedin.com/in/mohd-ibadullah-4786b640a/)
+Maintained by **MOHD IBADULLAH**
 
 ---
 
